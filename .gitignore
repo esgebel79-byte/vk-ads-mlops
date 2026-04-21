@@ -11,6 +11,7 @@ data/processed/
 models/
 mlruns/
 artifacts/
+.dvc/tmp/
 *.log
 *.tmp
 .DS_Store
