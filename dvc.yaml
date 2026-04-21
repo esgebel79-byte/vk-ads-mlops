@@ -25,7 +25,7 @@ stages:
       - data/processed/stage9
 
   stage4_prepare_deepsets:
-    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe src/features/prepare_deepsets_dataset.py --stage1-dir data/interim/stage1 --stage2-dir data/interim/stage2 --stage9-dir data/processed/stage9 --out-dir data/processed/stage10
+    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe src/features/prepare_deepsets_dataset.py --stage1-dir data/interim/stage1 --stage2-dir data/interim/stage2 --stage9-dir data/processed/stage9 --out-dir data/processed/stage10 --K 256
     deps:
       - src/features/prepare_deepsets_dataset.py
       - data/interim/stage1
