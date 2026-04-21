@@ -1,0 +1,43 @@
+stages:
+
+  stage1_prepare_data:
+    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe src/data/make_dataset.py --data-dir data/raw --out-dir data/interim/stage1
+    deps:
+      - src/data/make_dataset.py
+      - data/raw
+    outs:
+      - data/interim/stage1
+
+  stage2_offline_dataset:
+    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe src/data/make_offline_dataset.py --stage1-dir data/interim/stage1 --out-dir data/interim/stage2
+    deps:
+      - src/data/make_offline_dataset.py
+      - data/interim/stage1
+    outs:
+      - data/interim/stage2
+
+  stage3_user_features:
+    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe src/features/build_user_features.py --stage1-dir data/interim/stage1 --out-dir data/processed/stage9
+    deps:
+      - src/features/build_user_features.py
+      - data/interim/stage1
+    outs:
+      - data/processed/stage9
+
+  stage4_prepare_deepsets:
+    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe src/features/prepare_deepsets_dataset.py --stage1-dir data/interim/stage1 --stage2-dir data/interim/stage2 --stage9-dir data/processed/stage9 --out-dir data/processed/stage10
+    deps:
+      - src/features/prepare_deepsets_dataset.py
+      - data/interim/stage1
+      - data/interim/stage2
+      - data/processed/stage9
+    outs:
+      - data/processed/stage10
+
+  stage5_train_model:
+    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe src/models/train_deepsets_attention.py --stage10-dir data/processed/stage10 --out-dir models/deepsets
+    deps:
+      - src/models/train_deepsets_attention.py
+      - data/processed/stage10
+    outs:
+      - models/deepsets
