@@ -1,0 +1,16 @@
+seed: 42
+
+data:
+  raw_dir: data/raw
+  interim_dir: data/interim
+  processed_dir: data/processed
+
+train:
+  model_type: deepsets_attention
+  batch_size: 128
+  epochs: 30
+  lr: 0.002
+  K: 256
+
+service:
+  model_path: models/final_model

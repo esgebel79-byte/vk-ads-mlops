@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.idea/
+.venv/
+venv/
+.env
+
+data/raw/
+data/interim/
+data/processed/
+models/
+mlruns/
+artifacts/
+*.log
+*.tmp
+.DS_Store
