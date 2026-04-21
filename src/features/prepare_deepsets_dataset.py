@@ -168,8 +168,12 @@ def main():
     offline_c = offline_c.sort_values("campaign_id").reset_index(drop=True)
 
     validate = pd.read_parquet(stage1_dir / "validate.parquet")
-    validate_answers_path = Path("data") / "validate_answers.tsv"
-    validate_answers = pd.read_csv(validate_answers_path, sep="\t") if validate_answers_path.exists() else None
+
+    validate_answers_parquet = stage1_dir / "validate_answers.parquet"
+    if validate_answers_parquet.exists():
+        validate_answers = pd.read_parquet(validate_answers_parquet)
+    else:
+        validate_answers = None
 
     rep = {}
     rep["user_table"] = {

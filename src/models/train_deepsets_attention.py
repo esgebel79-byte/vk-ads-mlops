@@ -89,7 +89,8 @@ class CondAttnPooling(nn.Module):
         q = self.query(c).view(B, self.n_heads, self.head_dim)   # [B,H,D]
         logits = (k * q[:, None, :, :]).sum(dim=-1) / self.scale  # [B,K,H]
         if mask is not None:
-            logits = logits.masked_fill(~mask[:, :, None], -1e9)
+            neg_large = -1e4 if logits.dtype in (torch.float16, torch.bfloat16) else -1e9
+            logits = logits.masked_fill(~mask[:, :, None], neg_large)
         w = torch.softmax(logits, dim=1)                          # [B,K,H]
         pooled = (w[:, :, :, None] * k).sum(dim=1)                # [B,H,D]
         return pooled.reshape(B, self.n_heads * self.head_dim)    # [B, H*D]
@@ -131,10 +132,12 @@ class HeavyDeepSets(nn.Module):
             z_mean = z.mean(dim=1)
             z_max = z.max(dim=1).values
         else:
-            m = mask[:, :, None].float()
+            m = mask[:, :, None].to(z.dtype)
             denom = m.sum(dim=1).clamp(min=1.0)
             z_mean = (z * m).sum(dim=1) / denom
-            z_masked = z.masked_fill(~mask[:, :, None], -1e9)
+
+            neg_large = torch.finfo(z.dtype).min
+            z_masked = z.masked_fill(~mask[:, :, None], neg_large)
             z_max = z_masked.max(dim=1).values
 
         z_attn = self.attn(z, camp_x, mask=mask)
