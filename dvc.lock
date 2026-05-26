@@ -1,8 +1,8 @@
 schema: '2.0'
 stages:
   stage1_prepare_data:
-    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe src/data/make_dataset.py 
-      --data-dir data/raw --out-dir data/interim/stage1
+    cmd: python src/data/make_dataset.py --data-dir data/raw --out-dir 
+      data/interim/stage1
     deps:
     - path: data/raw
       hash: md5
@@ -20,9 +20,8 @@ stages:
       size: 42999706
       nfiles: 11
   stage2_offline_dataset:
-    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe 
-      src/data/make_offline_dataset.py --stage1-dir data/interim/stage1 
-      --out-dir data/interim/stage2
+    cmd: python src/data/make_offline_dataset.py --stage1-dir 
+      data/interim/stage1 --out-dir data/interim/stage2
     deps:
     - path: data/interim/stage1
       hash: md5
@@ -36,13 +35,12 @@ stages:
     outs:
     - path: data/interim/stage2
       hash: md5
-      md5: 97a29fed38864b1528460b0f47da9215.dir
-      size: 38611663
+      md5: 9ea9aacf82d1ca51772ab93cd5ae387a.dir
+      size: 38611664
       nfiles: 5
   stage3_user_features:
-    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe 
-      src/features/build_user_features.py --stage1-dir data/interim/stage1 
-      --out-dir data/processed/stage9
+    cmd: python src/features/build_user_features.py --stage1-dir 
+      data/interim/stage1 --out-dir data/processed/stage9
     deps:
     - path: data/interim/stage1
       hash: md5
@@ -60,10 +58,9 @@ stages:
       size: 2261862
       nfiles: 2
   stage4_prepare_deepsets:
-    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe 
-      src/features/prepare_deepsets_dataset.py --stage1-dir data/interim/stage1 
-      --stage2-dir data/interim/stage2 --stage9-dir data/processed/stage9 
-      --out-dir data/processed/stage10
+    cmd: python src/features/prepare_deepsets_dataset.py --stage1-dir 
+      data/interim/stage1 --stage2-dir data/interim/stage2 --stage9-dir 
+      data/processed/stage9 --out-dir data/processed/stage10 --K 256
     deps:
     - path: data/interim/stage1
       hash: md5
@@ -72,8 +69,8 @@ stages:
       nfiles: 11
     - path: data/interim/stage2
       hash: md5
-      md5: 97a29fed38864b1528460b0f47da9215.dir
-      size: 38611663
+      md5: 9ea9aacf82d1ca51772ab93cd5ae387a.dir
+      size: 38611664
       nfiles: 5
     - path: data/processed/stage9
       hash: md5
@@ -87,26 +84,25 @@ stages:
     outs:
     - path: data/processed/stage10
       hash: md5
-      md5: 7d7c2505029444b85b094c90c46f3dd3.dir
-      size: 10907112
+      md5: 4914ae7bae59f0788a6a0f5964c3b916.dir
+      size: 15521262
       nfiles: 9
   stage5_train_model:
-    cmd: D:\miniconda3\envs\vk-ads-mlops\python.exe 
-      src/models/train_deepsets_attention.py --stage10-dir 
+    cmd: python src/models/train_deepsets_attention.py --stage10-dir 
       data/processed/stage10 --out-dir models/deepsets
     deps:
     - path: data/processed/stage10
       hash: md5
-      md5: 7d7c2505029444b85b094c90c46f3dd3.dir
-      size: 10907112
+      md5: 4914ae7bae59f0788a6a0f5964c3b916.dir
+      size: 15521262
       nfiles: 9
     - path: src/models/train_deepsets_attention.py
       hash: md5
-      md5: b90fd4c075408854fb325c52b7b662e5
-      size: 11861
+      md5: 55fe826b70da19a498c223ad064fe6af
+      size: 14978
     outs:
     - path: models/deepsets
       hash: md5
-      md5: 9a144b1d70dcde5726511bf616fbafc4.dir
-      size: 4156142
+      md5: c0d7f3697e65b9d9b9d5306943223d23.dir
+      size: 4164208
       nfiles: 3
