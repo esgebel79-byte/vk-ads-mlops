@@ -1,4 +1,4 @@
-import argparse
+В предоставленном коде библиотека import mlflow импортирована, но обертка для интеграции с MLflow полностью отсутствует. Скрипт воссоздает валидационную выборку, загружает сохраненные модели CatBoost, считает метрики качества (MAE, RMSE, MAPE, $R^2$), выводит их в красивую таблицу в терминал и сохраняет в JSON-файл, но никак не регистрирует эти данные в системе трекинга.Для стадии оценки качества моделей (Evaluation Stage) в MLflow необходимо логировать:Контекст эксперимента и запуска (mlflow.set_experiment и mlflow.start_run).Параметры эксперимента — в данном случае очень важен фиксированный seed, размер выборки и пути к папкам.Числовые метрики — как усредненные (mean_MAE, mean_RMSE, mean_R2), так и детальные для каждого из трех таргетов отдельно. Это позволит строить сравнительные графики в UI.Финальные артефакты — итоговый файл отчета detailed_evaluation.json.Ниже представлен дополненный и готовый к интеграции в ваш пайплайн код скрипта.Исправленный и дополненный код скриптаPythonimport argparse
 import json
 from pathlib import Path
 
@@ -50,75 +50,102 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Loading data to recreate validation set...")
-    campaigns = pd.read_parquet(stage2_dir / "offline_campaigns.parquet")
-    answers = pd.read_parquet(stage2_dir / "offline_answers.parquet")
-    df = campaigns.merge(answers, on="campaign_id")
+    # --- НАСТРОЙКА MLFLOW EXPERIMENT ---
+    mlflow.set_experiment("vk-ads-clicks-prediction")
 
-    print("Extracting features...")
-    X = extract_features(df)
+    # Открываем контекст логирования в рамках отдельного запуска стадии оценки
+    with mlflow.start_run(run_name="CatBoost_Detailed_Evaluation"):
+        
+        # 1. Логируем входные параметры и воспроизводимый seed
+        mlflow.log_param("seed", args.seed)
+        mlflow.log_param("models_dir", str(models_dir))
+        mlflow.log_param("stage2_dir", str(stage2_dir))
 
-    # Повторяем сплит с тем же seed, чтобы точно получить ту же валидационную выборку (X_val)
-    _, X_val, _, idx_val = train_test_split(
-        X, np.arange(len(X)), test_size=0.2, random_state=args.seed
-    )
+        print("Loading data to recreate validation set...")
+        campaigns = pd.read_parquet(stage2_dir / "offline_campaigns.parquet")
+        answers = pd.read_parquet(stage2_dir / "offline_answers.parquet")
+        df = campaigns.merge(answers, on="campaign_id")
 
-    df_val = df.iloc[idx_val].copy()
+        print("Extracting features...")
+        X = extract_features(df)
 
-    targets = ["at_least_one", "at_least_two", "at_least_three"]
+        # Повторяем сплит с тем же seed, чтобы точно получить ту же валидационную выборку (X_val)
+        _, X_val, _, idx_val = train_test_split(
+            X, np.arange(len(X)), test_size=0.2, random_state=args.seed
+        )
 
-    detailed_metrics = {}
+        df_val = df.iloc[idx_val].copy()
+        mlflow.log_param("val_set_size", len(df_val))
 
-    print("\nCalculating metrics...\n" + "=" * 50)
-    print(f"{'Target':<18} | {'MAE':<8} | {'RMSE':<8} | {'MAPE(%)':<8} | {'R²':<8}")
-    print("=" * 50)
+        targets = ["at_least_one", "at_least_two", "at_least_three"]
+        detailed_metrics = {}
 
-    for target in targets:
-        y_true = df_val[target].values
+        print("\nCalculating metrics...\n" + "=" * 50)
+        print(f"{'Target':<18} | {'MAE':<8} | {'RMSE':<8} | {'MAPE(%)':<8} | {'R²':<8}")
+        print("=" * 50)
 
-        # Загрузка модели
-        model = CatBoostRegressor()
-        model.load_model(str(models_dir / f"cb_{target}.cbm"))
+        for target in targets:
+            y_true = df_val[target].values
 
-        # Предсказание
-        y_pred = model.predict(X_val)
-        y_pred = np.clip(y_pred, 0.0, 1.0)
+            # Загрузка модели
+            model = CatBoostRegressor()
+            model.load_model(str(models_dir / f"cb_{target}.cbm"))
 
-        # Расчет метрик
-        mae = mean_absolute_error(y_true, y_pred)
-        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-        mape = safe_mape(y_true, y_pred)
-        r2 = r2_score(y_true, y_pred)
+            # Предсказание
+            y_pred = model.predict(X_val)
+            y_pred = np.clip(y_pred, 0.0, 1.0)
 
-        detailed_metrics[target] = {
-            "MAE": float(mae),
-            "RMSE": float(rmse),
-            "MAPE": float(mape),
-            "R2": float(r2)
+            # Расчет метрик
+            mae = mean_absolute_error(y_true, y_pred)
+            rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+            mape = safe_mape(y_true, y_pred)
+            r2 = r2_score(y_true, y_pred)
+
+            detailed_metrics[target] = {
+                "MAE": float(mae),
+                "RMSE": float(rmse),
+                "MAPE": float(mape),
+                "R2": float(r2)
+            }
+
+            print(f"{target:<18} | {mae:.4f}   | {rmse:.4f}   | {mape:.2f}    | {r2:.4f}")
+
+            # 2. Логируем детальные метрики по каждому таргету отдельно
+            mlflow.log_metric(f"{target}_MAE", float(mae))
+            mlflow.log_metric(f"{target}_RMSE", float(rmse))
+            mlflow.log_metric(f"{target}_MAPE", float(mape))
+            mlflow.log_metric(f"{target}_R2", float(r2))
+
+        print("=" * 50)
+
+        # Средние значения по всем таргетам
+        mean_mae = np.mean([m["MAE"] for m in detailed_metrics.values()])
+        mean_rmse = np.mean([m["RMSE"] for m in detailed_metrics.values()])
+        mean_r2 = np.mean([m["R2"] for m in detailed_metrics.values()])
+
+        print(f"{'MEAN (Overall)':<18} | {mean_mae:.4f}   | {mean_rmse:.4f}   | {'-':<8} | {mean_r2:.4f}")
+
+        # 3. Логируем агрегированные (итоговые) метрики
+        mlflow.log_metric("overall_mean_MAE", float(mean_mae))
+        mlflow.log_metric("overall_mean_RMSE", float(mean_rmse))
+        mlflow.log_metric("overall_mean_R2", float(mean_r2))
+
+        detailed_metrics["overall"] = {
+            "mean_MAE": float(mean_mae),
+            "mean_RMSE": float(mean_rmse),
+            "mean_R2": float(mean_r2)
         }
 
-        print(f"{target:<18} | {mae:.4f}   | {rmse:.4f}   | {mape:.2f}    | {r2:.4f}")
+        # Сохраняем подробный отчет локально
+        report_path = out_dir / "detailed_evaluation.json"
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(detailed_metrics, f, ensure_ascii=False, indent=2)
 
-    print("=" * 50)
+        print(f"\nDetailed metrics saved to {report_path}")
 
-    # Средние значения по всем таргетам
-    mean_mae = np.mean([m["MAE"] for m in detailed_metrics.values()])
-    mean_rmse = np.mean([m["RMSE"] for m in detailed_metrics.values()])
-    mean_r2 = np.mean([m["R2"] for m in detailed_metrics.values()])
-
-    print(f"{'MEAN (Overall)':<18} | {mean_mae:.4f}   | {mean_rmse:.4f}   | {'-':<8} | {mean_r2:.4f}")
-
-    detailed_metrics["overall"] = {
-        "mean_MAE": float(mean_mae),
-        "mean_RMSE": float(mean_rmse),
-        "mean_R2": float(mean_r2)
-    }
-
-    # Сохраняем подробный отчет
-    with open(out_dir / "detailed_evaluation.json", "w", encoding="utf-8") as f:
-        json.dump(detailed_metrics, f, ensure_ascii=False, indent=2)
-
-    print(f"\nDetailed metrics saved to {out_dir / 'detailed_evaluation.json'}")
+        # 4. Логируем сохраненный файл json как артефакт в MLflow
+        mlflow.log_artifact(str(report_path), artifact_path="evaluation_reports")
+        print("[MLflow] Validation metrics and artifacts successfully registered!")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-import argparse
+В данном коде импортирована библиотека import mlflow, но обертка для логирования в MLflow полностью отсутствует. Скрипт рассчитывает метрики (MAE, RMSE, $R^2$), проверяет монотонность предсказаний и считает ошибку на срезах (slices), после чего просто сохраняет локальные файлы, никак не регистрируя результаты в системе трекинга.Для стадии валидации и оценки моделей (Evaluation Stage) критически важно отправлять в MLflow:Глобальные метрики (mean_MAE, mean_RMSE, mean_R2) — по ним удобно сравнивать качество разных версий моделей и подходов в дашборде.Потаргетные метрики (MAE/RMSE/$R^2$ для at_least_one, at_least_two, at_least_three).Проверки адекватности (Sanity checks) — долю соблюдения монотонности предсказаний.Финальные артефакты — полный JSON-отчет report_validate.json и посимвольный анализ ошибок per_row_errors.tsv.Ниже представлен дополненный код скрипта, интегрированный с MLflow.Исправленный и дополненный код скриптаPythonimport argparse
 import json
 from pathlib import Path
 
@@ -7,7 +7,6 @@ import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 import mlflow
-
 
 TARGETS = ["at_least_one", "at_least_two", "at_least_three"]
 
@@ -128,6 +127,37 @@ def main():
     print(f"Wrote: {per_row_out}")
     print(f"Wrote: {report_out}")
     print(json.dumps(report["overall"], ensure_ascii=False, indent=2))
+
+    # --- ИНТЕГРАЦИЯ С MLFLOW ---
+    # Указываем имя эксперимента
+    mlflow.set_experiment("vk-ads-clicks-prediction")
+
+    # Начинаем или продолжаем текущий запуск трекинга
+    with mlflow.start_run(run_name="Evaluation_Stage"):
+        # 1. Логируем входные параметры (какой файл предсказаний оценивали)
+        mlflow.log_param("evaluated_pred_path", str(pred_path))
+
+        # 2. Логируем общие (усредненные) метрики качества
+        mlflow.log_metric("mean_MAE", report["overall"]["mean_MAE"])
+        mlflow.log_metric("mean_RMSE", report["overall"]["mean_RMSE"])
+        mlflow.log_metric("mean_R2", report["overall"]["mean_R2"])
+
+        # 3. Логируем метрики детально по каждому целевому признаку (таргету)
+        for t in TARGETS:
+            mlflow.log_metric(f"{t}_MAE", report["by_target"][t]["MAE"])
+            mlflow.log_metric(f"{t}_RMSE", report["by_target"][t]["RMSE"])
+            mlflow.log_metric(f"{t}_R2", report["by_target"][t]["R2"])
+
+        # 4. Логируем метрики проверки адекватности предсказаний (Sanity checks)
+        mlflow.log_metric("sanity_monotonic_share_p1_ge_p2", mono_12)
+        mlflow.log_metric("sanity_monotonic_share_p2_ge_p3", mono_23)
+        mlflow.log_metric("sanity_monotonic_share_p1_ge_p3", mono_13)
+
+        # 5. Логируем сгенерированные файлы отчетов как артефакты
+        mlflow.log_artifact(str(report_out), artifact_path="evaluation_reports")
+        mlflow.log_artifact(str(per_row_out), artifact_path="evaluation_reports")
+        
+        print("\n[MLflow] Metrics, parameters and artifacts successfully tracked!")
 
 
 if __name__ == "__main__":

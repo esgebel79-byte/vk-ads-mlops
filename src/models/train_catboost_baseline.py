@@ -11,10 +11,11 @@ from sklearn.model_selection import train_test_split
 import mlflow
 import mlflow.catboost
 
-# путь к локальной папке трекинга
+# Указываем путь к локальной папке трекинга
 mlflow.set_tracking_uri("file:///C:/Users/Elena/Desktop/vk-ads-mlops/mlruns")
-# Инициализируем эксперимента
+# Инициализируем эксперимент (если его нет, MLflow создаст его автоматически)
 mlflow.set_experiment("vk-ads-clicks-prediction")
+
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     """Извлекает числовые признаки из DataFrame кампаний."""
@@ -23,16 +24,12 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     features["audience_size"] = df["audience_size"].astype(float)
     features["window_length"] = (df["hour_end"] - df["hour_start"] + 1).astype(float)
 
-    # Считаем количество площадок
-    # publishers хранятся как строка "1,2,3" или пустая
     def count_pubs(s):
         if pd.isna(s) or s == "":
             return 0
         return len(str(s).split(","))
 
     features["n_publishers"] = df["publishers"].apply(count_pubs).astype(float)
-
-    # Дополнительные нелинейные фичи, помогающие деревьям
     features["cpm_per_hour"] = features["cpm"] / features["window_length"]
 
     return features
@@ -54,7 +51,6 @@ def main():
     campaigns = pd.read_csv(stage2_dir / "offline_campaigns.tsv", sep="\t")
     answers = pd.read_csv(stage2_dir / "offline_answers.tsv", sep="\t")
 
-    # Слияние по campaign_id
     df = campaigns.merge(answers, on="campaign_id")
 
     print("Extracting features...")
@@ -63,7 +59,6 @@ def main():
     y_two = df["at_least_two"].values
     y_three = df["at_least_three"].values
 
-    # Разбиение на Train и Validation
     X_train, X_val, idx_train, idx_val = train_test_split(
         X, np.arange(len(X)), test_size=0.2, random_state=args.seed
     )
@@ -79,61 +74,87 @@ def main():
 
     print(f"Train size: {len(X_train)}, Val size: {len(X_val)}")
 
-    for target_name, y_full in targets:
-        print(f"\nTraining model for {target_name}...")
-        y_train = y_full[idx_train]
-        y_val = y_full[idx_val]
+    # ГЛАВНЫЙ ЗАПУСК MLFLOW (Объединяет весь пайплайн обучения baseline-моделей)
+    with mlflow.start_run(run_name="CatBoost_Baseline_Pipeline") as parent_run:
+        # Логируем глобальные параметры пайплайна
+        mlflow.log_param("pipeline_type", "Multi-Target CatBoost Baseline")
+        mlflow.log_param("global_seed", args.seed)
+        mlflow.log_param("max_iterations", args.iters)
+        mlflow.log_param("train_size", len(X_train))
+        mlflow.log_param("val_size", len(X_val))
 
-        model = CatBoostRegressor(
-            iterations=args.iters,
-            learning_rate=0.05,
-            depth=6,
-            eval_metric='MAE',
-            random_seed=args.seed,
-            verbose=100
-        )
+        for target_name, y_full in targets:
+            print(f"\nTraining model for {target_name}...")
+            y_train = y_full[idx_train]
+            y_val = y_full[idx_val]
 
-        model.fit(
-            X_train, y_train,
-            eval_set=(X_val, y_val),
-            early_stopping_rounds=50,
-            use_best_model=True
-        )
+            # ВЛОЖЕННЫЙ ЗАПУСК ДЛЯ КОНКРЕТНОГО ТАРГЕТА (Nested Run)
+            with mlflow.start_run(run_name=f"CatBoost_{target_name}", nested=True):
+                
+                model = CatBoostRegressor(
+                    iterations=args.iters,
+                    learning_rate=0.05,
+                    depth=6,
+                    eval_metric='MAE',
+                    random_seed=args.seed,
+                    verbose=100
+                )
 
-        preds_val = model.predict(X_val)
-        # Ограничиваем предсказания физичным диапазоном [0, 1]
-        preds_val = np.clip(preds_val, 0.0, 1.0)
+                model.fit(
+                    X_train, y_train,
+                    eval_set=(X_val, y_val),
+                    early_stopping_rounds=50,
+                    use_best_model=True
+                )
 
-        mae = mean_absolute_error(y_val, preds_val)
-        metrics_report[target_name] = {"MAE": float(mae)}
+                preds_val = model.predict(X_val)
+                preds_val = np.clip(preds_val, 0.0, 1.0)
 
-        model_path = out_dir / f"cb_{target_name}.cbm"
-        model.save_model(str(model_path))
-        models[target_name] = model
+                mae = mean_absolute_error(y_val, preds_val)
+                metrics_report[target_name] = {"MAE": float(mae)}
 
-        print(f"MAE {target_name}: {mae:.5f}")
+                model_path = out_dir / f"cb_{target_name}.cbm"
+                model.save_model(str(model_path))
+                models[target_name] = model
 
-    # Считаем средний MAE по трем таргетам
-    mean_mae = np.mean([metrics_report[t]["MAE"] for t, _ in targets])
-    metrics_report["mean_MAE"] = float(mean_mae)
+                print(f"MAE {target_name}: {mae:.5f}")
 
-    print(f"\nOverall Mean MAE: {mean_mae:.5f}")
+                # Логируем параметры и метрики конкретной модели в её вложенный запуск
+                mlflow.log_param("target", target_name)
+                mlflow.log_param("learning_rate", 0.05)
+                mlflow.log_param("depth", 6)
+                mlflow.log_metric("MAE", float(mae))
+                
+                # Сохраняем модель как артефакт в MLflow Registry
+                mlflow.catboost.log_model(model, artifact_path=f"model_{target_name}")
 
-    # Сохраняем отчет о метриках
-    report = {
-        "train_size": len(X_train),
-        "val_size": len(X_val),
-        "metrics": metrics_report,
-        "feature_importance": {
-            target_name: dict(zip(X.columns, models[target_name].get_feature_importance()))
-            for target_name, _ in targets
+        # Расчет и логирование итоговой интегральной метрики пайплайна
+        mean_mae = np.mean([metrics_report[t]["MAE"] for t, _ in targets])
+        metrics_report["mean_MAE"] = float(mean_mae)
+        print(f"\nOverall Mean MAE: {mean_mae:.5f}")
+
+        # Отправляем итоговый агрегированный показатель в родительский запуск
+        mlflow.log_metric("overall_mean_MAE", float(mean_mae))
+
+        # Сохраняем финальный JSON-отчет
+        report = {
+            "train_size": len(X_train),
+            "val_size": len(X_val),
+            "metrics": metrics_report,
+            "feature_importance": {
+                target_name: dict(zip(X.columns, models[target_name].get_feature_importance()))
+                for target_name, _ in targets
+            }
         }
-    }
 
-    with open(out_dir / "metrics_report.json", "w", encoding="utf-8") as f:
-        json.dump(report, f, ensure_ascii=False, indent=2)
+        report_path = out_dir / "metrics_report.json"
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(report, f, ensure_ascii=False, indent=2)
 
-    print(f"\nSaved models and metrics to {out_dir}")
+        # Логируем сам файл отчета в качестве артефакта главного запуска
+        mlflow.log_artifact(str(report_path))
+
+        print(f"\nSaved models, metrics, and MLflow records successfully.")
 
 
 if __name__ == "__main__":
