@@ -51,8 +51,8 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    validate_path = data_dir / "validate.tsv"
-    answers_path = data_dir / "validate_answers.tsv"
+    validate_path = data_dir / "raw" / "validate.tsv"
+    answers_path = data_dir / "raw" / "validate_answers.tsv"
 
     validate = pd.read_csv(validate_path, sep="\t")
     answers = pd.read_csv(answers_path, sep="\t")

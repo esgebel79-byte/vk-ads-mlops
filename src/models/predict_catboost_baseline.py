@@ -29,7 +29,7 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", type=str, default="data", help="Папка с исходным validate.tsv")
-    ap.add_argument("--models-dir", type=str, default="artifacts/stage3", help="Папка с обученными моделями")
+    ap.add_argument("--models-dir", type=str, default="data/processed/stage3", help="Папка с обученными моделями")
     ap.add_argument("--out-dir", type=str, default="artifacts/stage4", help="Папка для результатов")
     args = ap.parse_args()
 
@@ -50,7 +50,7 @@ def main():
 
         print("Loading validation data...")
         # Читаем исходный validate.tsv
-        validate = pd.read_csv(data_dir / "validate.tsv", sep="\t")
+        validate = pd.read_csv(data_dir / "raw" / "validate.tsv", sep="\t")
         mlflow.log_param("num_validation_samples", len(validate))
 
         print("Extracting features...")

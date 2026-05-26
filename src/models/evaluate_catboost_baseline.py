@@ -39,8 +39,8 @@ def safe_mape(y_true, y_pred, epsilon=1e-8):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage2-dir", type=str, default="artifacts/stage2_full", help="Данные для валидации")
-    ap.add_argument("--models-dir", type=str, default="artifacts/stage3", help="Папка с моделями")
+    ap.add_argument("--stage2-dir", type=str, default="data/interim/stage2", help="Данные для валидации")
+    ap.add_argument("--models-dir", type=str, default="data/processed/stage3", help="Папка с моделями")
     ap.add_argument("--out-dir", type=str, default="artifacts/stage5", help="Папка для отчетов")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()

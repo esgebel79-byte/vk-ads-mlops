@@ -161,7 +161,7 @@ def make_mask_and_gather(user_idx: torch.Tensor, user_table: torch.Tensor):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage10-dir", type=str, default="artifacts/stage10_K256")
+    ap.add_argument("--stage10-dir", type=str, default="data/processed/stage10")
     ap.add_argument("--out-dir", type=str, default="artifacts/stage13_K256")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--epochs", type=int, default=30)
