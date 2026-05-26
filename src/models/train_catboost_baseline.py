@@ -8,6 +8,13 @@ from catboost import CatBoostRegressor
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
 
+import mlflow
+import mlflow.catboost
+
+# путь к локальной папке трекинга
+mlflow.set_tracking_uri("file:///C:/Users/Elena/Desktop/vk-ads-mlops/mlruns")
+# Инициализируем эксперимента
+mlflow.set_experiment("vk-ads-clicks-prediction")
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     """Извлекает числовые признаки из DataFrame кампаний."""
@@ -33,8 +40,8 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage2-dir", type=str, default="artifacts/stage2_full")
-    ap.add_argument("--out-dir", type=str, default="artifacts/stage3")
+    ap.add_argument("--stage2-dir", type=str, default="data/interim/stage2")
+    ap.add_argument("--out-dir", type=str, default="data/processed/stage3")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--iters", type=int, default=1000)
     args = ap.parse_args()
@@ -44,8 +51,8 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print("Loading data...")
-    campaigns = pd.read_parquet(stage2_dir / "offline_campaigns.parquet")
-    answers = pd.read_parquet(stage2_dir / "offline_answers.parquet")
+    campaigns = pd.read_csv(stage2_dir / "offline_campaigns.tsv", sep="\t")
+    answers = pd.read_csv(stage2_dir / "offline_answers.tsv", sep="\t")
 
     # Слияние по campaign_id
     df = campaigns.merge(answers, on="campaign_id")

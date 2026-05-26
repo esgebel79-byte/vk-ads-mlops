@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor
 
+import mlflow
+
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     """Извлекает числовые признаки из DataFrame кампаний (совпадает с обучением)."""

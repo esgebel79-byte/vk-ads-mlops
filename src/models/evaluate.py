@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+import mlflow
+
 
 TARGETS = ["at_least_one", "at_least_two", "at_least_three"]
 
