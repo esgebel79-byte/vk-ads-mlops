@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -12,9 +13,9 @@ import mlflow
 import mlflow.catboost
 
 # Указываем путь к локальной папке трекинга
-mlflow.set_tracking_uri("file:///C:/Users/Elena/Desktop/vk-ads-mlops/mlruns")
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
 # Инициализируем эксперимент (если его нет, MLflow создаст его автоматически)
-mlflow.set_experiment("vk-ads-clicks-prediction")
+mlflow.set_experiment(os.getenv("MLFLOW_EXPERIMENT", "vk-ads-reach-prediction"))
 
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:

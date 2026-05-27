@@ -1,43 +1,69 @@
 stages:
 
   stage1_prepare_data:
-    cmd: python src/data/make_dataset.py --data-dir data/raw --out-dir data/interim/stage1
+    cmd: python src/data/make_dataset.py --data-dir ${data.raw_dir} --out-dir ${data.interim_dir}/stage1
+    params:
+      - data.raw_dir
+      - data.interim_dir
     deps:
       - src/data/make_dataset.py
-      - data/raw
+      - ${data.raw_dir}
     outs:
-      - data/interim/stage1
+      - ${data.interim_dir}/stage1
 
   stage2_offline_dataset:
-    cmd: python src/data/make_offline_dataset.py --stage1-dir data/interim/stage1 --out-dir data/interim/stage2
+    cmd: python src/data/make_offline_dataset.py --stage1-dir ${data.interim_dir}/stage1 --out-dir ${data.interim_dir}/stage2 --n-campaigns ${offline_dataset.n_campaigns} --seed ${seed} --max-window-hours ${offline_dataset.max_window_hours}
+    params:
+      - seed
+      - data.interim_dir
+      - offline_dataset.n_campaigns
+      - offline_dataset.max_window_hours
     deps:
       - src/data/make_offline_dataset.py
-      - data/interim/stage1
+      - ${data.interim_dir}/stage1
     outs:
-      - data/interim/stage2
+      - ${data.interim_dir}/stage2
 
   stage3_user_features:
-    cmd: python src/features/build_user_features.py --stage1-dir data/interim/stage1 --out-dir data/processed/stage9
+    cmd: python src/features/build_user_features.py --stage1-dir ${data.interim_dir}/stage1 --out-dir ${data.processed_dir}/stage9
+    params:
+      - data.interim_dir
+      - data.processed_dir
     deps:
       - src/features/build_user_features.py
-      - data/interim/stage1
+      - ${data.interim_dir}/stage1
     outs:
-      - data/processed/stage9
+      - ${data.processed_dir}/stage9
 
   stage4_prepare_deepsets:
-    cmd: python src/features/prepare_deepsets_dataset.py --stage1-dir data/interim/stage1 --stage2-dir data/interim/stage2 --stage9-dir data/processed/stage9 --out-dir data/processed/stage10 --K 256
+    cmd: python src/features/prepare_deepsets_dataset.py --stage1-dir ${data.interim_dir}/stage1 --stage2-dir ${data.interim_dir}/stage2 --stage9-dir ${data.processed_dir}/stage9 --out-dir ${data.processed_dir}/stage10 --K ${deepsets.K} --seed ${seed}
+    params:
+      - seed
+      - data.interim_dir
+      - data.processed_dir
+      - deepsets.K
     deps:
       - src/features/prepare_deepsets_dataset.py
-      - data/interim/stage1
-      - data/interim/stage2
-      - data/processed/stage9
+      - ${data.interim_dir}/stage1
+      - ${data.interim_dir}/stage2
+      - ${data.processed_dir}/stage9
     outs:
-      - data/processed/stage10
+      - ${data.processed_dir}/stage10
 
   stage5_train_model:
-    cmd: python src/models/train_deepsets_attention.py --stage10-dir data/processed/stage10 --out-dir models/deepsets
+    cmd: python src/models/train_deepsets_attention.py --stage10-dir ${data.processed_dir}/stage10 --out-dir models/deepsets --seed ${seed} --epochs ${train.epochs} --batch-size ${train.batch_size} --lr ${train.lr} --device ${train.device} --model-type ${train.model_type} --mlflow-tracking-uri ${mlflow.tracking_uri} --mlflow-experiment ${mlflow.experiment}
+    params:
+      - seed
+      - data.processed_dir
+      - train.epochs
+      - train.batch_size
+      - train.lr
+      - train.device
+      - train.model_type
+      - mlflow.tracking_uri
+      - mlflow.experiment
     deps:
       - src/models/train_deepsets_attention.py
-      - data/processed/stage10
+      - ${data.processed_dir}/stage10
     outs:
       - models/deepsets

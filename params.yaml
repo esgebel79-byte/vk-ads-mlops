@@ -5,12 +5,23 @@ data:
   interim_dir: data/interim
   processed_dir: data/processed
 
-train:
-  model_type: deepsets_attention
-  batch_size: 128
-  epochs: 30
-  lr: 0.002
+offline_dataset:
+  n_campaigns: 5000
+  max_window_hours: 168
+
+deepsets:
   K: 256
 
+train:
+  model_type: deepsets_attention
+  epochs: 30
+  batch_size: 128
+  lr: 0.002
+  device: auto
+
+mlflow:
+  tracking_uri: file:./mlruns
+  experiment: vk-ads-reach-prediction
+
 service:
-  model_path: models/final_model
+  model_path: models/deepsets/deepsets_attn.pt
