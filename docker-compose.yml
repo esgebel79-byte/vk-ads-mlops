@@ -1,0 +1,63 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: services/inference_api/Dockerfile
+      args:
+        INSTALL_INFERENCE_DEPS: "true"
+    environment:
+      MODEL_PATH: /app/models/deepsets/deepsets_attn.pt
+      MODEL_REPORT_PATH: /app/models/deepsets/report_stage13.json
+      STAGE10_DIR: /app/data/processed/stage10
+      MODEL_DEVICE: cpu
+      DRIFT_THRESHOLD: "0.2"
+      DRIFT_WINDOW_SIZE: "100"
+      DRIFT_MIN_BATCH: "20"
+      DRIFT_REPORTS_DIR: /app/reports/drift
+      ENABLE_RETRAIN: "false"
+      RETRAIN_COMMAND: python -m dvc repro stage5_train_model
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./mlruns:/app/mlruns
+      - ./reports:/app/reports
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.14.3
+    command: mlflow ui --backend-store-uri file:/mlruns --host 0.0.0.0 --port 5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlruns
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deployments/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployments/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:

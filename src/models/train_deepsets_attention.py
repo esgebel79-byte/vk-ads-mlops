@@ -2,20 +2,20 @@ import argparse
 import json
 import os
 import time
+from contextlib import nullcontext
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-import mlflow
-import mlflow.pytorch
-
-# Указываем путь к локальной папке трекинга и эксперименту
-mlflow.set_tracking_uri("file:///C:/Users/Elena/Desktop/vk-ads-mlops/mlruns")
-mlflow.set_experiment("vk-ads-clicks-prediction")
+try:
+    import mlflow
+except ImportError:
+    mlflow = None
 
 TARGET_NAMES = ["at_least_one", "at_least_two", "at_least_three"]
 
@@ -54,6 +54,18 @@ def metrics_np(y_true, y_pred):
         "mean_R2": float(np.mean([out[n]["R2"] for n in TARGET_NAMES])),
     }
     return out
+
+
+def log_validate_metrics(metrics: dict):
+    overall = metrics["overall"]
+    mlflow.log_metric("validate_mean_MAE", overall["mean_MAE"])
+    mlflow.log_metric("validate_mean_RMSE", overall["mean_RMSE"])
+    mlflow.log_metric("validate_mean_R2", overall["mean_R2"])
+    for target in TARGET_NAMES:
+        target_metrics = metrics[target]
+        mlflow.log_metric(f"validate_{target}_MAE", target_metrics["MAE"])
+        mlflow.log_metric(f"validate_{target}_RMSE", target_metrics["RMSE"])
+        mlflow.log_metric(f"validate_{target}_R2", target_metrics["R2"])
 
 
 def norm_fit(X: np.ndarray):
@@ -97,8 +109,8 @@ class CondAttnPooling(nn.Module):
         if mask is not None:
             neg_large = -1e4 if logits.dtype in (torch.float16, torch.bfloat16) else -1e9
             logits = logits.masked_fill(~mask[:, :, None], neg_large)
-        w = torch.softmax(logits, dim=1)                                         # [B,K,H]
-        pooled = (w[:, :, :, None] * k).sum(dim=1)                               # [B,H,D]
+        w = torch.softmax(logits, dim=1)                          # [B,K,H]
+        pooled = (w[:, :, :, None] * k).sum(dim=1)                # [B,H,D]
         return pooled.reshape(B, self.n_heads * self.head_dim)    # [B, H*D]
 
 
@@ -168,6 +180,10 @@ def main():
     ap.add_argument("--batch-size", type=int, default=512)
     ap.add_argument("--lr", type=float, default=2e-3)
     ap.add_argument("--device", type=str, default="auto")  # auto|cpu|cuda
+    ap.add_argument("--model-type", type=str, default="deepsets_attention")
+    ap.add_argument("--mlflow-tracking-uri", type=str, default="file:./mlruns")
+    ap.add_argument("--mlflow-experiment", type=str, default="vk-ads-reach-prediction")
+    ap.add_argument("--disable-mlflow", action="store_true")
     args = ap.parse_args()
 
     os.environ["OMP_NUM_THREADS"] = os.environ.get("OMP_NUM_THREADS", "8")
@@ -192,58 +208,67 @@ def main():
     else:
         device = torch.device(args.device)
 
-    N = off_camp.shape[0]
-    idx = np.arange(N)
-    rng = np.random.default_rng(args.seed)
-    rng.shuffle(idx)
-    n_val = int(0.1 * N)
-    idx_val = idx[:n_val]
-    idx_tr = idx[n_val:]
+    mlflow_enabled = not args.disable_mlflow and mlflow is not None
+    if not args.disable_mlflow and mlflow is None:
+        print("MLflow is not installed; training will run without experiment logging.")
 
-    camp_mean, camp_std = norm_fit(off_camp[idx_tr])
-    off_camp_n = norm_apply(off_camp, camp_mean, camp_std)
-    val_camp_n = norm_apply(val_camp, camp_mean, camp_std)
+    if mlflow_enabled:
+        mlflow.set_tracking_uri(args.mlflow_tracking_uri)
+        mlflow.set_experiment(args.mlflow_experiment)
 
-    user_mean, user_std = norm_fit(user_feat)
-    user_feat_n = norm_apply(user_feat, user_mean, user_std)
+    run_context = mlflow.start_run(run_name=args.model_type) if mlflow_enabled else nullcontext()
 
-    ds_tr = NpyDataset(off_camp_n[idx_tr], off_ui[idx_tr], off_y[idx_tr])
-    ds_va = NpyDataset(off_camp_n[idx_val], off_ui[idx_val], off_y[idx_val])
-    dl_tr = DataLoader(ds_tr, batch_size=args.batch_size, shuffle=True, num_workers=0)
-    dl_va = DataLoader(ds_va, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    with run_context:
+        if mlflow_enabled:
+            mlflow.log_params(
+                {
+                    "seed": int(args.seed),
+                    "epochs": int(args.epochs),
+                    "batch_size": int(args.batch_size),
+                    "lr": float(args.lr),
+                    "K": int(off_ui.shape[1]),
+                    "model_type": args.model_type,
+                    "user_dim": int(user_feat.shape[1]),
+                    "campaign_dim": int(off_camp.shape[1]),
+                    "device": str(device),
+                }
+            )
 
-    user_table = torch.from_numpy(user_feat_n).to(device)
-    model = HeavyDeepSets(user_dim=user_feat.shape[1], camp_dim=off_camp.shape[1]).to(device)
+        # offline split 10%
+        N = off_camp.shape[0]
+        idx = np.arange(N)
+        rng = np.random.default_rng(args.seed)
+        rng.shuffle(idx)
+        n_val = int(0.1 * N)
+        idx_val = idx[:n_val]
+        idx_tr = idx[n_val:]
 
-    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
-    loss_fn = nn.SmoothL1Loss(beta=0.02)
+        camp_mean, camp_std = norm_fit(off_camp[idx_tr])
+        off_camp_n = norm_apply(off_camp, camp_mean, camp_std)
+        val_camp_n = norm_apply(val_camp, camp_mean, camp_std)
 
-    use_amp = (device.type == "cuda")
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+        user_mean, user_std = norm_fit(user_feat)
+        user_feat_n = norm_apply(user_feat, user_mean, user_std)
 
-    best = {"epoch": -1, "val_mae": 1e9, "state": None}
-    t0 = time.time()
+        ds_tr = NpyDataset(off_camp_n[idx_tr], off_ui[idx_tr], off_y[idx_tr])
+        ds_va = NpyDataset(off_camp_n[idx_val], off_ui[idx_val], off_y[idx_val])
+        dl_tr = DataLoader(ds_tr, batch_size=args.batch_size, shuffle=True, num_workers=0)
+        dl_va = DataLoader(ds_va, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
-    # ИНИЦИАЛИЗАЦИЯ ЗАПУСКА В MLFLOW
-    with mlflow.start_run(run_name="HeavyDeepSets_Attention_Model") as run:
-        # Логируем гиперпараметры обучения сети
-        mlflow.log_params({
-            "architecture": "HeavyDeepSets_with_CondAttnPooling",
-            "seed": args.seed,
-            "epochs": args.epochs,
-            "batch_size": args.batch_size,
-            "lr": args.lr,
-            "device": str(device),
-            "user_dim": user_feat.shape[1],
-            "camp_dim": off_camp.shape[1],
-            "K_sequence_length": off_ui.shape[1]
-        })
+        user_table = torch.from_numpy(user_feat_n).to(device)
+        model = HeavyDeepSets(user_dim=user_feat.shape[1], camp_dim=off_camp.shape[1]).to(device)
+
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
+        loss_fn = nn.SmoothL1Loss(beta=0.02)
+
+        use_amp = (device.type == "cuda")
+        scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+
+        best = {"epoch": -1, "val_mae": 1e9, "state": None}
+        t0 = time.time()
 
         for epoch in range(int(args.epochs)):
             model.train()
-            train_loss_accum = 0.0
-            steps = 0
-            
             for camp_x, ui, y in dl_tr:
                 camp_x = camp_x.to(device, non_blocking=True)
                 ui = ui.to(device, non_blocking=True)
@@ -259,13 +284,6 @@ def main():
                 scaler.scale(loss).backward()
                 scaler.step(opt)
                 scaler.update()
-                
-                train_loss_accum += loss.item()
-                steps += 1
-
-            # Вычисление среднего лосса за эпоху и отправка в MLflow
-            epoch_train_loss = train_loss_accum / steps
-            mlflow.log_metric("train_loss_epoch", epoch_train_loss, step=epoch)
 
             model.eval()
             preds = []
@@ -285,8 +303,8 @@ def main():
             pv = clip_monotone_np(pv)
             val_mae = float(np.mean([mean_absolute_error(tv[:, j], pv[:, j]) for j in range(3)]))
 
-            # Логируем валидационный MAE на каждой эпохе для построения кривой сходимости
-            mlflow.log_metric("val_mae_epoch", val_mae, step=epoch)
+            if mlflow_enabled:
+                mlflow.log_metric("offline10pct_val_mean_MAE", val_mae, step=epoch)
 
             if val_mae < best["val_mae"]:
                 best["val_mae"] = val_mae
@@ -297,13 +315,8 @@ def main():
 
         model.load_state_dict(best["state"])
         train_time = time.time() - t0
-        
-        # Логируем лучшие промежуточные результаты
-        mlflow.log_metric("best_epoch_offline10pct", int(best["epoch"]))
-        mlflow.log_metric("best_val_mae_offline10pct", float(best["val_mae"]))
-        mlflow.log_metric("train_time_sec", float(train_time))
 
-        # Вычисление инференса на валидационном множестве (1008)
+        # validate inference (1008)
         model.eval()
         with torch.no_grad():
             camp_x = torch.from_numpy(val_camp_n).to(device)
@@ -315,16 +328,10 @@ def main():
         pred = clip_monotone_np(pred)
         m = metrics_np(val_y.astype(np.float64), pred)
 
-        # Отправка финальных комплексных метрик (MAE, RMSE, R2) в MLflow Dashboard
-        for target, scores in m.items():
-            for metric_name, score_val in scores.items():
-                mlflow.log_metric(f"final_{target}_{metric_name}", score_val)
-
         pred_path = out_dir / "predictions_deepsets_attn.tsv"
-        pd = __import__("pandas")
         pd.DataFrame(pred, columns=TARGET_NAMES).to_csv(pred_path, sep="\t", index=False)
 
-        # Сохранение весов и метаданных локально
+        checkpoint_path = out_dir / "deepsets_attn.pt"
         torch.save(
             {
                 "state_dict": model.state_dict(),
@@ -337,14 +344,11 @@ def main():
                 "k": int(off_ui.shape[1]),
                 "user_dim": int(user_feat.shape[1]),
                 "camp_dim": int(off_camp.shape[1]),
+                "model_type": args.model_type,
             },
-            out_dir / "deepsets_attn.pt"
+            checkpoint_path
         )
 
-        # Регистрация PyTorch-модели со структурой в MLflow Registry артефактов
-        mlflow.pytorch.log_model(model, artifact_path="heavy_deepsets_model")
-
-        # Генерация и логирование JSON отчета
         report = {
             "stage10_dir": str(stage10),
             "device": str(device),
@@ -353,19 +357,28 @@ def main():
             "batch_size": int(args.batch_size),
             "lr": float(args.lr),
             "K": int(off_ui.shape[1]),
+            "model_type": args.model_type,
+            "user_dim": int(user_feat.shape[1]),
+            "campaign_dim": int(off_camp.shape[1]),
             "train_time_sec": float(train_time),
             "best_epoch_offline10pct": int(best["epoch"]),
             "best_val_mae_offline10pct": float(best["val_mae"]),
             "validate_metrics": m,
             "pred_path": str(pred_path),
+            "checkpoint_path": str(checkpoint_path),
         }
-        
         report_path = out_dir / "report_stage13.json"
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
 
-        # Отправляем файл json-отчета в артефакты MLflow
-        mlflow.log_artifact(str(report_path))
+        if mlflow_enabled:
+            log_validate_metrics(m)
+            mlflow.log_metric("best_epoch_offline10pct", int(best["epoch"]))
+            mlflow.log_metric("best_val_mae_offline10pct", float(best["val_mae"]))
+            mlflow.log_metric("train_time_sec", float(train_time))
+            mlflow.log_artifact(str(report_path))
+            mlflow.log_artifact(str(pred_path))
+            mlflow.log_artifact(str(checkpoint_path))
 
         print(json.dumps(m, ensure_ascii=False, indent=2))
         print(f"Wrote: {report_path}")

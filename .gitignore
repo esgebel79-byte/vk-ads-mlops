@@ -8,9 +8,10 @@ venv/
 data/raw/
 data/interim/
 data/processed/
-models/
+/models/
 mlruns/
 artifacts/
+reports/
 .dvc/tmp/
 *.log
 *.tmp

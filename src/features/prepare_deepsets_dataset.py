@@ -161,11 +161,17 @@ def main():
     np.save(out_dir / "user_id_sorted.npy", user_id_sorted)
     np.save(out_dir / "user_feat.npy", user_feat)
 
-    pub_universe = np.sort(pd.read_parquet(stage1_dir / "history_train.parquet", columns=["publisher"])["publisher"].astype(int).unique()).tolist()
-
     offline_c = pd.read_parquet(stage2_dir / "offline_campaigns.parquet")
     offline_a = pd.read_parquet(stage2_dir / "offline_answers.parquet").sort_values("campaign_id").reset_index(drop=True)
     offline_c = offline_c.sort_values("campaign_id").reset_index(drop=True)
+
+    pub_universe = np.sort(pd.read_parquet(stage1_dir / "history_train.parquet", columns=["publisher"])["publisher"].astype(int).unique()).tolist()
+    campaign_feature_columns = build_campaign_features(offline_c.iloc[0:0], pub_universe).columns.tolist()
+    np.save(out_dir / "pub_universe.npy", np.array(pub_universe, dtype=np.int32))
+    with open(out_dir / "pub_universe.json", "w", encoding="utf-8") as f:
+        json.dump([int(x) for x in pub_universe], f, ensure_ascii=False, indent=2)
+    with open(out_dir / "campaign_feature_columns.json", "w", encoding="utf-8") as f:
+        json.dump(campaign_feature_columns, f, ensure_ascii=False, indent=2)
 
     validate = pd.read_parquet(stage1_dir / "validate.parquet")
 
@@ -183,6 +189,7 @@ def main():
         "user_id_max": int(user_id_sorted.max()),
     }
     rep["pub_universe_size"] = int(len(pub_universe))
+    rep["campaign_feature_dim"] = int(len(campaign_feature_columns))
     rep["K"] = int(args.K)
     rep["seed"] = int(args.seed)
 
