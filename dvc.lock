@@ -13,6 +13,10 @@ stages:
       hash: md5
       md5: 35189b73b2ceab45417d57ae5caf771b
       size: 8718
+    params:
+      params.yaml:
+        data.interim_dir: data/interim
+        data.raw_dir: data/raw
     outs:
     - path: data/interim/stage1
       hash: md5
@@ -21,7 +25,8 @@ stages:
       nfiles: 11
   stage2_offline_dataset:
     cmd: python src/data/make_offline_dataset.py --stage1-dir 
-      data/interim/stage1 --out-dir data/interim/stage2
+      data/interim/stage1 --out-dir data/interim/stage2 --n-campaigns 5000 
+      --seed 42 --max-window-hours 168
     deps:
     - path: data/interim/stage1
       hash: md5
@@ -32,11 +37,17 @@ stages:
       hash: md5
       md5: 323a19e1a7a141cb96a93a08b94110f7
       size: 10715
+    params:
+      params.yaml:
+        data.interim_dir: data/interim
+        offline_dataset.max_window_hours: 168
+        offline_dataset.n_campaigns: 5000
+        seed: 42
     outs:
     - path: data/interim/stage2
       hash: md5
-      md5: 9ea9aacf82d1ca51772ab93cd5ae387a.dir
-      size: 38611664
+      md5: 08402e09278d8ff3d065b3850fd84af8.dir
+      size: 38611663
       nfiles: 5
   stage3_user_features:
     cmd: python src/features/build_user_features.py --stage1-dir 
@@ -51,6 +62,10 @@ stages:
       hash: md5
       md5: c7bd8d066999ccf5d5be454c8cfb4161
       size: 6580
+    params:
+      params.yaml:
+        data.interim_dir: data/interim
+        data.processed_dir: data/processed
     outs:
     - path: data/processed/stage9
       hash: md5
@@ -60,7 +75,7 @@ stages:
   stage4_prepare_deepsets:
     cmd: python src/features/prepare_deepsets_dataset.py --stage1-dir 
       data/interim/stage1 --stage2-dir data/interim/stage2 --stage9-dir 
-      data/processed/stage9 --out-dir data/processed/stage10 --K 256
+      data/processed/stage9 --out-dir data/processed/stage10 --K 256 --seed 42
     deps:
     - path: data/interim/stage1
       hash: md5
@@ -69,8 +84,8 @@ stages:
       nfiles: 11
     - path: data/interim/stage2
       hash: md5
-      md5: 9ea9aacf82d1ca51772ab93cd5ae387a.dir
-      size: 38611664
+      md5: 08402e09278d8ff3d065b3850fd84af8.dir
+      size: 38611663
       nfiles: 5
     - path: data/processed/stage9
       hash: md5
@@ -79,30 +94,50 @@ stages:
       nfiles: 2
     - path: src/features/prepare_deepsets_dataset.py
       hash: md5
-      md5: 16fd2a0bc62a5ef81d2ec7dccc80ed68
-      size: 7845
+      md5: 8947988ed444cc6b8a5951c12f013a88
+      size: 8430
+    params:
+      params.yaml:
+        data.interim_dir: data/interim
+        data.processed_dir: data/processed
+        deepsets.K: 256
+        seed: 42
     outs:
     - path: data/processed/stage10
       hash: md5
-      md5: 4914ae7bae59f0788a6a0f5964c3b916.dir
-      size: 15521262
-      nfiles: 9
+      md5: 45cf1c13ad8afa82fe31bef4bd3dc6d6.dir
+      size: 15522486
+      nfiles: 12
   stage5_train_model:
     cmd: python src/models/train_deepsets_attention.py --stage10-dir 
-      data/processed/stage10 --out-dir models/deepsets
+      data/processed/stage10 --out-dir models/deepsets --seed 42 --epochs 30 
+      --batch-size 128 --lr 0.002 --device auto --model-type deepsets_attention 
+      --mlflow-tracking-uri file:./mlruns --mlflow-experiment 
+      vk-ads-reach-prediction
     deps:
     - path: data/processed/stage10
       hash: md5
-      md5: 4914ae7bae59f0788a6a0f5964c3b916.dir
-      size: 15521262
-      nfiles: 9
+      md5: 45cf1c13ad8afa82fe31bef4bd3dc6d6.dir
+      size: 15522486
+      nfiles: 12
     - path: src/models/train_deepsets_attention.py
       hash: md5
-      md5: 55fe826b70da19a498c223ad064fe6af
-      size: 14978
+      md5: 036349fffedfa77cee28ff8bfaff9c0d
+      size: 15197
+    params:
+      params.yaml:
+        data.processed_dir: data/processed
+        mlflow.experiment: vk-ads-reach-prediction
+        mlflow.tracking_uri: file:./mlruns
+        seed: 42
+        train.batch_size: 128
+        train.device: auto
+        train.epochs: 30
+        train.lr: 0.002
+        train.model_type: deepsets_attention
     outs:
     - path: models/deepsets
       hash: md5
-      md5: c0d7f3697e65b9d9b9d5306943223d23.dir
-      size: 4164208
+      md5: 55395c2ff35f73ccfca592307258c75b.dir
+      size: 4166986
       nfiles: 3
