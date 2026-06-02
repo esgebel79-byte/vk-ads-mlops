@@ -16,8 +16,9 @@ services:
       DRIFT_REPORTS_DIR: /app/reports/drift
       ENABLE_RETRAIN: "false"
       RETRAIN_COMMAND: python -m dvc repro stage5_train_model
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./data:/app/data
       - ./models:/app/models
@@ -25,10 +26,10 @@ services:
       - ./reports:/app/reports
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.14.3
-    command: mlflow ui --backend-store-uri file:/mlruns --host 0.0.0.0 --port 5000
+    image: ghcr.io/mlflow/mlflow:v3.12.0
+    command: mlflow server --backend-store-uri sqlite:////mlruns/mlflow.db --default-artifact-root file:/mlruns --host 0.0.0.0 --port 5000 --allowed-hosts localhost,localhost:5000,127.0.0.1,127.0.0.1:5000,mlflow,mlflow:5000
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     volumes:
       - ./mlruns:/mlruns
 
@@ -38,7 +39,7 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./deployments/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -51,7 +52,7 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./deployments/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro

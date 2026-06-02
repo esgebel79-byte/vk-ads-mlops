@@ -130,8 +130,8 @@ class CampaignRequest(BaseModel):
     def validate_window(self) -> "CampaignRequest":
         if self.hour_end < self.hour_start:
             raise ValueError("hour_end must be greater than or equal to hour_start")
-        if self.audience_size and self.user_ids and self.audience_size != len(self.user_ids):
-            raise ValueError("audience_size must match len(user_ids) when user_ids are provided")
+        if self.audience_size and self.user_ids and self.audience_size < len(self.user_ids):
+            raise ValueError("audience_size must be greater than or equal to len(user_ids)")
         return self
 
 
@@ -298,6 +298,16 @@ class ModelBundle:
         values = {name: float(pred[i]) for i, name in enumerate(TARGET_NAMES)}
         combined_drift = drift_flag or bool(data_drift and data_drift.get("drift_flag"))
         return values, combined_drift, data_drift
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "service": "vk-ads-reach-prediction-api",
+        "health": "/health",
+        "docs": "/docs",
+        "metrics": "/metrics",
+    }
 
 
 def stable_seed(value: str, seed: int) -> int:
