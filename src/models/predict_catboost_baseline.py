@@ -1,11 +1,15 @@
 import argparse
 from pathlib import Path
+from contextlib import nullcontext
 
 import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor
 
-import mlflow
+try:
+    import mlflow
+except Exception:
+    mlflow = None
 
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -31,6 +35,9 @@ def main():
     ap.add_argument("--data-dir", type=str, default="data", help="Папка с исходным validate.tsv")
     ap.add_argument("--models-dir", type=str, default="data/processed/stage3", help="Папка с обученными моделями")
     ap.add_argument("--out-dir", type=str, default="artifacts/stage4", help="Папка для результатов")
+    ap.add_argument("--mlflow-tracking-uri", type=str, default=None)
+    ap.add_argument("--mlflow-experiment", type=str, default="vk-ads-clicks-prediction")
+    ap.add_argument("--disable-mlflow", action="store_true")
     args = ap.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -38,15 +45,18 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- НАСТРОЙКА MLFLOW EXPERIMENT ---
-    mlflow.set_experiment("vk-ads-clicks-prediction")
+    # --- НАСТРОЙКА MLFLOW (опционально) ---
+    mlflow_enabled = (not args.disable_mlflow) and (mlflow is not None)
+    if args.mlflow_tracking_uri and mlflow_enabled:
+        mlflow.set_tracking_uri(args.mlflow_tracking_uri)
+    if mlflow_enabled:
+        mlflow.set_experiment(args.mlflow_experiment)
 
-    # Открываем контекст автоматического логирования запуска инференса
-    with mlflow.start_run(run_name="CatBoost_Inference_Stage"):
-        
-        # Логируем входные параметры скрипта
-        mlflow.log_param("models_dir", str(models_dir))
-        mlflow.log_param("data_dir", str(data_dir))
+    run_context = mlflow.start_run(run_name="CatBoost_Inference_Stage") if mlflow_enabled else nullcontext()
+    with run_context:
+        if mlflow_enabled:
+            mlflow.log_param("models_dir", str(models_dir))
+            mlflow.log_param("data_dir", str(data_dir))
 
         print("Loading validation data...")
         # Читаем исходный validate.tsv
@@ -73,7 +83,8 @@ def main():
             predictions[target] = preds
             
             # Логируем факт использования конкретной модели под каждый таргет
-            mlflow.log_param(f"model_path_{target}", str(model_path))
+            if mlflow_enabled:
+                mlflow.log_param(f"model_path_{target}", str(model_path))
 
         # Собираем итоговый датафрейм (строго по порядку строк из validate.tsv)
         out_df = pd.DataFrame({
@@ -92,8 +103,9 @@ def main():
 
         # --- ЛОГИРОВАНИЕ ФИНАЛЬНОГО АРТЕФАКТА В MLFLOW ---
         # Сохраняем полученный файл предсказаний прямо в UI MLflow, чтобы его можно было скачать оттуда
-        mlflow.log_artifact(str(out_path), artifact_path="validation_outputs")
-        print("\nPredictions file successfully logged as an MLflow artifact.")
+        if mlflow_enabled:
+            mlflow.log_artifact(str(out_path), artifact_path="validation_outputs")
+            print("\nPredictions file successfully logged as an MLflow artifact.")
 
 
 if __name__ == "__main__":

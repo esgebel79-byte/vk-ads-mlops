@@ -1,12 +1,16 @@
 import argparse
 import json
 from pathlib import Path
+from contextlib import nullcontext
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-import mlflow
+try:
+    import mlflow
+except Exception:
+    mlflow = None
 
 TARGETS = ["at_least_one", "at_least_two", "at_least_three"]
 
@@ -44,6 +48,9 @@ def main():
     ap.add_argument("--data-dir", type=str, default="data")
     ap.add_argument("--pred-path", type=str, default="artifacts/stage4/predictions.tsv")
     ap.add_argument("--out-dir", type=str, default="artifacts/stage6")
+    ap.add_argument("--mlflow-tracking-uri", type=str, default=None)
+    ap.add_argument("--mlflow-experiment", type=str, default="vk-ads-clicks-prediction")
+    ap.add_argument("--disable-mlflow", action="store_true")
     args = ap.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -128,36 +135,35 @@ def main():
     print(f"Wrote: {report_out}")
     print(json.dumps(report["overall"], ensure_ascii=False, indent=2))
 
-    # --- ИНТЕГРАЦИЯ С MLFLOW ---
-    # Указываем имя эксперимента
-    mlflow.set_experiment("vk-ads-clicks-prediction")
+    # --- ИНТЕГРАЦИЯ С MLFLOW (опционально) ---
+    mlflow_enabled = (not args.disable_mlflow) and (mlflow is not None)
+    if args.mlflow_tracking_uri and mlflow_enabled:
+        mlflow.set_tracking_uri(args.mlflow_tracking_uri)
+    if mlflow_enabled:
+        mlflow.set_experiment(args.mlflow_experiment)
 
-    # Начинаем или продолжаем текущий запуск трекинга
-    with mlflow.start_run(run_name="Evaluation_Stage"):
-        # 1. Логируем входные параметры (какой файл предсказаний оценивали)
-        mlflow.log_param("evaluated_pred_path", str(pred_path))
+    run_context = mlflow.start_run(run_name="Evaluation_Stage") if mlflow_enabled else nullcontext()
+    with run_context:
+        if mlflow_enabled:
+            mlflow.log_param("evaluated_pred_path", str(pred_path))
 
-        # 2. Логируем общие (усредненные) метрики качества
-        mlflow.log_metric("mean_MAE", report["overall"]["mean_MAE"])
-        mlflow.log_metric("mean_RMSE", report["overall"]["mean_RMSE"])
-        mlflow.log_metric("mean_R2", report["overall"]["mean_R2"])
+            mlflow.log_metric("mean_MAE", report["overall"]["mean_MAE"])
+            mlflow.log_metric("mean_RMSE", report["overall"]["mean_RMSE"])
+            mlflow.log_metric("mean_R2", report["overall"]["mean_R2"])
 
-        # 3. Логируем метрики детально по каждому целевому признаку (таргету)
-        for t in TARGETS:
-            mlflow.log_metric(f"{t}_MAE", report["by_target"][t]["MAE"])
-            mlflow.log_metric(f"{t}_RMSE", report["by_target"][t]["RMSE"])
-            mlflow.log_metric(f"{t}_R2", report["by_target"][t]["R2"])
+            for t in TARGETS:
+                mlflow.log_metric(f"{t}_MAE", report["by_target"][t]["MAE"])
+                mlflow.log_metric(f"{t}_RMSE", report["by_target"][t]["RMSE"])
+                mlflow.log_metric(f"{t}_R2", report["by_target"][t]["R2"])
 
-        # 4. Логируем метрики проверки адекватности предсказаний (Sanity checks)
-        mlflow.log_metric("sanity_monotonic_share_p1_ge_p2", mono_12)
-        mlflow.log_metric("sanity_monotonic_share_p2_ge_p3", mono_23)
-        mlflow.log_metric("sanity_monotonic_share_p1_ge_p3", mono_13)
+            mlflow.log_metric("sanity_monotonic_share_p1_ge_p2", mono_12)
+            mlflow.log_metric("sanity_monotonic_share_p2_ge_p3", mono_23)
+            mlflow.log_metric("sanity_monotonic_share_p1_ge_p3", mono_13)
 
-        # 5. Логируем сгенерированные файлы отчетов как артефакты
-        mlflow.log_artifact(str(report_out), artifact_path="evaluation_reports")
-        mlflow.log_artifact(str(per_row_out), artifact_path="evaluation_reports")
-        
-        print("\n[MLflow] Metrics, parameters and artifacts successfully tracked!")
+            mlflow.log_artifact(str(report_out), artifact_path="evaluation_reports")
+            mlflow.log_artifact(str(per_row_out), artifact_path="evaluation_reports")
+
+            print("\n[MLflow] Metrics, parameters and artifacts successfully tracked!")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from contextlib import nullcontext
 
 import numpy as np
 import pandas as pd
@@ -9,13 +10,11 @@ from catboost import CatBoostRegressor
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
 
-import mlflow
-import mlflow.catboost
-
-# Указываем путь к локальной папке трекинга
-mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
-# Инициализируем эксперимент (если его нет, MLflow создаст его автоматически)
-mlflow.set_experiment(os.getenv("MLFLOW_EXPERIMENT", "vk-ads-reach-prediction"))
+try:
+    import mlflow
+    import mlflow.catboost
+except Exception:
+    mlflow = None
 
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -42,6 +41,9 @@ def main():
     ap.add_argument("--out-dir", type=str, default="data/processed/stage3")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--iters", type=int, default=1000)
+    ap.add_argument("--mlflow-tracking-uri", type=str, default=os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
+    ap.add_argument("--mlflow-experiment", type=str, default=os.getenv("MLFLOW_EXPERIMENT", "vk-ads-reach-prediction"))
+    ap.add_argument("--disable-mlflow", action="store_true")
     args = ap.parse_args()
 
     stage2_dir = Path(args.stage2_dir)
@@ -75,23 +77,33 @@ def main():
 
     print(f"Train size: {len(X_train)}, Val size: {len(X_val)}")
 
-    # ГЛАВНЫЙ ЗАПУСК MLFLOW (Объединяет весь пайплайн обучения baseline-моделей)
-    with mlflow.start_run(run_name="CatBoost_Baseline_Pipeline") as parent_run:
-        # Логируем глобальные параметры пайплайна
-        mlflow.log_param("pipeline_type", "Multi-Target CatBoost Baseline")
-        mlflow.log_param("global_seed", args.seed)
-        mlflow.log_param("max_iterations", args.iters)
-        mlflow.log_param("train_size", len(X_train))
-        mlflow.log_param("val_size", len(X_val))
+    # MLflow args were parsed earlier
+
+    mlflow_enabled = not args.disable_mlflow and mlflow is not None
+    if not args.disable_mlflow and mlflow is None:
+        print("MLflow is not installed; training will run without experiment logging.")
+
+    if mlflow_enabled:
+        mlflow.set_tracking_uri(args.mlflow_tracking_uri)
+        mlflow.set_experiment(args.mlflow_experiment)
+
+    run_context = mlflow.start_run(run_name="CatBoost_Baseline_Pipeline") if mlflow_enabled else nullcontext()
+
+    with run_context:
+        if mlflow_enabled:
+            mlflow.log_param("pipeline_type", "Multi-Target CatBoost Baseline")
+            mlflow.log_param("global_seed", args.seed)
+            mlflow.log_param("max_iterations", args.iters)
+            mlflow.log_param("train_size", len(X_train))
+            mlflow.log_param("val_size", len(X_val))
 
         for target_name, y_full in targets:
             print(f"\nTraining model for {target_name}...")
             y_train = y_full[idx_train]
             y_val = y_full[idx_val]
 
-            # ВЛОЖЕННЫЙ ЗАПУСК ДЛЯ КОНКРЕТНОГО ТАРГЕТА (Nested Run)
-            with mlflow.start_run(run_name=f"CatBoost_{target_name}", nested=True):
-                
+            nested_ctx = mlflow.start_run(run_name=f"CatBoost_{target_name}", nested=True) if mlflow_enabled else nullcontext()
+            with nested_ctx:
                 model = CatBoostRegressor(
                     iterations=args.iters,
                     learning_rate=0.05,
@@ -120,22 +132,20 @@ def main():
 
                 print(f"MAE {target_name}: {mae:.5f}")
 
-                # Логируем параметры и метрики конкретной модели в её вложенный запуск
-                mlflow.log_param("target", target_name)
-                mlflow.log_param("learning_rate", 0.05)
-                mlflow.log_param("depth", 6)
-                mlflow.log_metric("MAE", float(mae))
-                
-                # Сохраняем модель как артефакт в MLflow Registry
-                mlflow.catboost.log_model(model, artifact_path=f"model_{target_name}")
+                if mlflow_enabled:
+                    mlflow.log_param("target", target_name)
+                    mlflow.log_param("learning_rate", 0.05)
+                    mlflow.log_param("depth", 6)
+                    mlflow.log_metric("MAE", float(mae))
+                    mlflow.catboost.log_model(model, artifact_path=f"model_{target_name}")
 
         # Расчет и логирование итоговой интегральной метрики пайплайна
         mean_mae = np.mean([metrics_report[t]["MAE"] for t, _ in targets])
         metrics_report["mean_MAE"] = float(mean_mae)
         print(f"\nOverall Mean MAE: {mean_mae:.5f}")
 
-        # Отправляем итоговый агрегированный показатель в родительский запуск
-        mlflow.log_metric("overall_mean_MAE", float(mean_mae))
+        if mlflow_enabled:
+            mlflow.log_metric("overall_mean_MAE", float(mean_mae))
 
         # Сохраняем финальный JSON-отчет
         report = {
@@ -153,7 +163,8 @@ def main():
             json.dump(report, f, ensure_ascii=False, indent=2)
 
         # Логируем сам файл отчета в качестве артефакта главного запуска
-        mlflow.log_artifact(str(report_path))
+        if mlflow_enabled:
+            mlflow.log_artifact(str(report_path))
 
         print(f"\nSaved models, metrics, and MLflow records successfully.")
 

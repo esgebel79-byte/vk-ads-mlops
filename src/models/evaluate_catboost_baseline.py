@@ -1,6 +1,7 @@
 import argparse
 import json
 from pathlib import Path
+from contextlib import nullcontext
 
 import numpy as np
 import pandas as pd
@@ -8,7 +9,10 @@ from catboost import CatBoostRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-import mlflow
+try:
+    import mlflow
+except Exception:
+    mlflow = None
 
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -43,6 +47,9 @@ def main():
     ap.add_argument("--models-dir", type=str, default="data/processed/stage3", help="Папка с моделями")
     ap.add_argument("--out-dir", type=str, default="artifacts/stage5", help="Папка для отчетов")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--mlflow-tracking-uri", type=str, default=None)
+    ap.add_argument("--mlflow-experiment", type=str, default="vk-ads-clicks-prediction")
+    ap.add_argument("--disable-mlflow", action="store_true")
     args = ap.parse_args()
 
     stage2_dir = Path(args.stage2_dir)
@@ -50,16 +57,19 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- НАСТРОЙКА MLFLOW EXPERIMENT ---
-    mlflow.set_experiment("vk-ads-clicks-prediction")
+    # --- НАСТРОЙКА MLFLOW (опционально) ---
+    mlflow_enabled = (not args.disable_mlflow) and (mlflow is not None)
+    if args.mlflow_tracking_uri and mlflow_enabled:
+        mlflow.set_tracking_uri(args.mlflow_tracking_uri)
+    if mlflow_enabled:
+        mlflow.set_experiment(args.mlflow_experiment)
 
-    # Открываем контекст логирования в рамках отдельного запуска стадии оценки
-    with mlflow.start_run(run_name="CatBoost_Detailed_Evaluation"):
-        
-        # 1. Логируем входные параметры и воспроизводимый seed
-        mlflow.log_param("seed", args.seed)
-        mlflow.log_param("models_dir", str(models_dir))
-        mlflow.log_param("stage2_dir", str(stage2_dir))
+    run_context = mlflow.start_run(run_name="CatBoost_Detailed_Evaluation") if mlflow_enabled else nullcontext()
+    with run_context:
+        if mlflow_enabled:
+            mlflow.log_param("seed", args.seed)
+            mlflow.log_param("models_dir", str(models_dir))
+            mlflow.log_param("stage2_dir", str(stage2_dir))
 
         print("Loading data to recreate validation set...")
         campaigns = pd.read_parquet(stage2_dir / "offline_campaigns.parquet")
@@ -111,10 +121,11 @@ def main():
             print(f"{target:<18} | {mae:.4f}   | {rmse:.4f}   | {mape:.2f}    | {r2:.4f}")
 
             # 2. Логируем детальные метрики по каждому таргету отдельно
-            mlflow.log_metric(f"{target}_MAE", float(mae))
-            mlflow.log_metric(f"{target}_RMSE", float(rmse))
-            mlflow.log_metric(f"{target}_MAPE", float(mape))
-            mlflow.log_metric(f"{target}_R2", float(r2))
+            if mlflow_enabled:
+                mlflow.log_metric(f"{target}_MAE", float(mae))
+                mlflow.log_metric(f"{target}_RMSE", float(rmse))
+                mlflow.log_metric(f"{target}_MAPE", float(mape))
+                mlflow.log_metric(f"{target}_R2", float(r2))
 
         print("=" * 50)
 
@@ -126,9 +137,10 @@ def main():
         print(f"{'MEAN (Overall)':<18} | {mean_mae:.4f}   | {mean_rmse:.4f}   | {'-':<8} | {mean_r2:.4f}")
 
         # 3. Логируем агрегированные (итоговые) метрики
-        mlflow.log_metric("overall_mean_MAE", float(mean_mae))
-        mlflow.log_metric("overall_mean_RMSE", float(mean_rmse))
-        mlflow.log_metric("overall_mean_R2", float(mean_r2))
+        if mlflow_enabled:
+            mlflow.log_metric("overall_mean_MAE", float(mean_mae))
+            mlflow.log_metric("overall_mean_RMSE", float(mean_rmse))
+            mlflow.log_metric("overall_mean_R2", float(mean_r2))
 
         detailed_metrics["overall"] = {
             "mean_MAE": float(mean_mae),
@@ -144,8 +156,9 @@ def main():
         print(f"\nDetailed metrics saved to {report_path}")
 
         # 4. Логируем сохраненный файл json как артефакт в MLflow
-        mlflow.log_artifact(str(report_path), artifact_path="evaluation_reports")
-        print("[MLflow] Validation metrics and artifacts successfully registered!")
+        if mlflow_enabled:
+            mlflow.log_artifact(str(report_path), artifact_path="evaluation_reports")
+            print("[MLflow] Validation metrics and artifacts successfully registered!")
 
 
 if __name__ == "__main__":
