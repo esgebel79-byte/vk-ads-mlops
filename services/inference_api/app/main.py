@@ -9,10 +9,11 @@ import time
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from pydantic import BaseModel, Field, model_validator
 
@@ -34,6 +35,13 @@ DEFAULT_STAGE10_DIR = PROJECT_ROOT / "data" / "processed" / "stage10"
 DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "deepsets" / "deepsets_attn.pt"
 DEFAULT_REPORT_PATH = PROJECT_ROOT / "models" / "deepsets" / "report_stage13.json"
 TARGET_NAMES = ["at_least_one", "at_least_two", "at_least_three"]
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
+DEFAULT_TIME_PRESETS = [6, 12, 24, 48, 72, 168]
 
 np: Any = None
 pd: Any = None
@@ -110,16 +118,25 @@ class Settings(BaseModel):
     model_version: str = "deepsets_attention"
     seed: int = 42
     max_recent_predictions: int = 100
+    max_sweep_points: int = 50
     drift_threshold: float = 0.2
     drift_window_size: int = 100
     drift_min_batch: int = 20
     drift_reports_dir: Path = Field(default=PROJECT_ROOT / "reports" / "drift")
     enable_retrain: bool = False
     retrain_command: str = "python -m dvc repro stage5_train_model"
+    cors_allow_origins: list[str] = Field(default_factory=lambda: list(DEFAULT_CORS_ORIGINS))
+    cpm_min: float = 0.0
+    cpm_max: float = 100.0
+    cpm_step: float = 5.0
+    cpm_median_competitor: float | None = None
+    cpm_max_competitor: float | None = None
+    time_min_hour: int = 0
+    time_max_hour: int = 168
+    session_silence_window_hours: float = 4.0
 
 
-class CampaignRequest(BaseModel):
-    cpm: float = Field(..., ge=0.0)
+class CampaignWindowRequest(BaseModel):
     hour_start: int
     hour_end: int
     publishers: list[int] = Field(default_factory=list)
@@ -127,12 +144,16 @@ class CampaignRequest(BaseModel):
     user_ids: list[int] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_window(self) -> "CampaignRequest":
+    def validate_window(self) -> "CampaignWindowRequest":
         if self.hour_end < self.hour_start:
             raise ValueError("hour_end must be greater than or equal to hour_start")
         if self.audience_size and self.user_ids and self.audience_size < len(self.user_ids):
             raise ValueError("audience_size must be greater than or equal to len(user_ids)")
         return self
+
+
+class CampaignRequest(CampaignWindowRequest):
+    cpm: float = Field(..., ge=0.0)
 
 
 class PredictionResponse(BaseModel):
@@ -142,6 +163,71 @@ class PredictionResponse(BaseModel):
     model_version: str
     drift_flag: bool
     prediction_id: str
+
+
+class CpmRange(BaseModel):
+    min: float = Field(..., ge=0.0)
+    max: float = Field(..., ge=0.0)
+    step: float = Field(..., gt=0.0)
+
+    @model_validator(mode="after")
+    def validate_range(self) -> "CpmRange":
+        if self.max < self.min:
+            raise ValueError("cpm_range.max must be greater than or equal to cpm_range.min")
+        return self
+
+
+class SweepRequest(BaseModel):
+    base_request: CampaignWindowRequest
+    cpm_range: CpmRange
+
+
+class SweepPoint(BaseModel):
+    cpm: float
+    at_least_one: float
+    at_least_two: float
+    at_least_three: float
+    predicted_reach: int
+    drift_flag: bool
+
+
+class SweepResponse(BaseModel):
+    sweep_id: str
+    points: list[SweepPoint]
+    model_version: str
+    latency_seconds: float
+
+
+class CpmMetadata(BaseModel):
+    min: float
+    max: float
+    step: float
+    median_competitor_cpm: float | None
+    max_competitor_cpm: float | None
+    source: Literal["artifact", "config", "unavailable"]
+
+
+class TimeMetadata(BaseModel):
+    mode: Literal["absolute_hours"] = "absolute_hours"
+    min_hour: int
+    max_hour: int
+    recommended_presets: list[int]
+    session_silence_window_hours: float
+
+
+class LimitsMetadata(BaseModel):
+    max_sweep_points: int
+    max_recent_predictions: int
+
+
+class MetadataResponse(BaseModel):
+    model_ready: bool
+    model_loaded: bool
+    model_version: str
+    publisher_universe: list[int]
+    cpm: CpmMetadata
+    time: TimeMetadata
+    limits: LimitsMetadata
 
 
 prediction_count = Counter("prediction_count", "Total number of prediction requests")
@@ -156,6 +242,23 @@ retrain_trigger_count = Counter("retrain_trigger_count", "Total number of retrai
 model_mae = Gauge("model_mae", "Latest model validation mean MAE")
 model_rmse = Gauge("model_rmse", "Latest model validation mean RMSE")
 
+def parse_cors_origins(raw: str | None) -> list[str]:
+    if raw is None:
+        return list(DEFAULT_CORS_ORIGINS)
+    value = raw.strip()
+    if not value:
+        return list(DEFAULT_CORS_ORIGINS)
+    if value == "*":
+        return ["*"]
+    return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+
+def parse_optional_float(raw: str | None) -> float | None:
+    if raw is None or not raw.strip():
+        return None
+    return float(raw)
+
+
 app = FastAPI(title="VK Ads Reach Prediction API", version="0.1.0")
 settings = Settings(
     model_path=Path(os.getenv("MODEL_PATH", str(DEFAULT_MODEL_PATH))),
@@ -163,12 +266,30 @@ settings = Settings(
     report_path=Path(os.getenv("MODEL_REPORT_PATH", str(DEFAULT_REPORT_PATH))),
     device=os.getenv("MODEL_DEVICE", "cpu"),
     seed=int(os.getenv("PREDICT_SEED", "42")),
+    max_recent_predictions=int(os.getenv("MAX_RECENT_PREDICTIONS", "100")),
+    max_sweep_points=int(os.getenv("MAX_SWEEP_POINTS", "50")),
     drift_threshold=float(os.getenv("DRIFT_THRESHOLD", "0.2")),
     drift_window_size=int(os.getenv("DRIFT_WINDOW_SIZE", "100")),
     drift_min_batch=int(os.getenv("DRIFT_MIN_BATCH", "20")),
     drift_reports_dir=Path(os.getenv("DRIFT_REPORTS_DIR", str(PROJECT_ROOT / "reports" / "drift"))),
     enable_retrain=os.getenv("ENABLE_RETRAIN", "false").lower() in {"1", "true", "yes"},
     retrain_command=os.getenv("RETRAIN_COMMAND", "python -m dvc repro stage5_train_model"),
+    cors_allow_origins=parse_cors_origins(os.getenv("CORS_ALLOW_ORIGINS")),
+    cpm_min=float(os.getenv("CPM_MIN", "0")),
+    cpm_max=float(os.getenv("CPM_MAX", "100")),
+    cpm_step=float(os.getenv("CPM_STEP", "5")),
+    cpm_median_competitor=parse_optional_float(os.getenv("CPM_MEDIAN_COMPETITOR")),
+    cpm_max_competitor=parse_optional_float(os.getenv("CPM_MAX_COMPETITOR")),
+    time_min_hour=int(os.getenv("TIME_MIN_HOUR", "0")),
+    time_max_hour=int(os.getenv("TIME_MAX_HOUR", "168")),
+    session_silence_window_hours=float(os.getenv("SESSION_SILENCE_WINDOW_HOURS", "4")),
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 recent_predictions: deque[dict[str, Any]] = deque(maxlen=settings.max_recent_predictions)
 recent_feature_rows: deque[dict[str, float]] = deque(maxlen=settings.drift_window_size)
@@ -305,6 +426,7 @@ def root() -> dict[str, str]:
     return {
         "service": "vk-ads-reach-prediction-api",
         "health": "/health",
+        "metadata": "/metadata",
         "docs": "/docs",
         "metrics": "/metrics",
     }
@@ -374,6 +496,142 @@ def model_artifact_status() -> dict[str, Any]:
     return {name: {"path": str(path), "exists": path.exists()} for name, path in required.items()}
 
 
+def load_publisher_universe_metadata() -> list[int]:
+    path = settings.stage10_dir / "pub_universe.npy"
+    if not path.exists():
+        return []
+    try:
+        if np is None:
+            import numpy as _np
+
+            values = _np.load(path)
+        else:
+            values = np.load(path)
+        return [int(x) for x in values.tolist()]
+    except Exception:
+        return []
+
+
+def load_reference_cpm_values() -> NumpyArray | None:
+    columns_path = settings.stage10_dir / "campaign_feature_columns.json"
+    features_path = settings.stage10_dir / "offline_campaign_feat.npy"
+    if not columns_path.exists() or not features_path.exists():
+        return None
+    try:
+        with open(columns_path, "r", encoding="utf-8") as f:
+            columns = [str(x) for x in json.load(f)]
+        if "cpm" not in columns:
+            return None
+        cpm_index = columns.index("cpm")
+        if np is None:
+            import numpy as _np
+
+            arr = _np.load(features_path)
+            values = arr[:, cpm_index].astype(_np.float64)
+            values = values[_np.isfinite(values)]
+        else:
+            arr = np.load(features_path)
+            values = arr[:, cpm_index].astype(np.float64)
+            values = values[np.isfinite(values)]
+        if values.size == 0:
+            return None
+        return values
+    except Exception:
+        return None
+
+
+def build_cpm_metadata() -> CpmMetadata:
+    cpm_min = settings.cpm_min
+    cpm_max = settings.cpm_max
+    cpm_step = settings.cpm_step
+    median_competitor: float | None = None
+    max_competitor: float | None = None
+    source: Literal["artifact", "config", "unavailable"] = "unavailable"
+
+    env_median = settings.cpm_median_competitor
+    env_max = settings.cpm_max_competitor
+    if env_median is not None or env_max is not None:
+        median_competitor = env_median
+        max_competitor = env_max
+        source = "config"
+    else:
+        values = load_reference_cpm_values()
+        if values is not None:
+            if np is None:
+                import numpy as _np
+
+                median_competitor = float(_np.median(values))
+                max_competitor = float(_np.max(values))
+                cpm_min = float(_np.min(values))
+                cpm_max = float(_np.max(values))
+            else:
+                median_competitor = float(np.median(values))
+                max_competitor = float(np.max(values))
+                cpm_min = float(np.min(values))
+                cpm_max = float(np.max(values))
+            source = "artifact"
+
+    return CpmMetadata(
+        min=cpm_min,
+        max=cpm_max,
+        step=cpm_step,
+        median_competitor_cpm=median_competitor,
+        max_competitor_cpm=max_competitor,
+        source=source,
+    )
+
+
+def build_time_metadata() -> TimeMetadata:
+    min_hour = settings.time_min_hour
+    max_hour = settings.time_max_hour
+    presets = [
+        preset
+        for preset in DEFAULT_TIME_PRESETS
+        if min_hour <= preset <= max_hour
+    ]
+    return TimeMetadata(
+        min_hour=min_hour,
+        max_hour=max_hour,
+        recommended_presets=presets,
+        session_silence_window_hours=settings.session_silence_window_hours,
+    )
+
+
+def build_metadata_response() -> MetadataResponse:
+    artifacts = model_artifact_status()
+    return MetadataResponse(
+        model_ready=all(item["exists"] for item in artifacts.values()),
+        model_loaded=model_bundle is not None,
+        model_version=settings.model_version,
+        publisher_universe=load_publisher_universe_metadata(),
+        cpm=build_cpm_metadata(),
+        time=build_time_metadata(),
+        limits=LimitsMetadata(
+            max_sweep_points=settings.max_sweep_points,
+            max_recent_predictions=settings.max_recent_predictions,
+        ),
+    )
+
+
+def generate_sweep_cpms(cpm_range: CpmRange) -> list[float]:
+    points: list[float] = []
+    cpm = cpm_range.min
+    while cpm <= cpm_range.max + 1e-9:
+        points.append(round(cpm, 6))
+        cpm += cpm_range.step
+    return points
+
+
+def validate_sweep_point_count(cpm_range: CpmRange) -> None:
+    point_count = len(generate_sweep_cpms(cpm_range))
+    if point_count > settings.max_sweep_points:
+        raise ValueError(
+            f"sweep generates {point_count} points, which exceeds MAX_SWEEP_POINTS={settings.max_sweep_points}"
+        )
+    if point_count == 0:
+        raise ValueError("cpm_range must generate at least one sweep point")
+
+
 def run_retrain(command: str) -> None:
     subprocess.run(command, cwd=PROJECT_ROOT, shell=True, check=False)
 
@@ -387,6 +645,11 @@ def health() -> dict[str, Any]:
         "model_ready": all(item["exists"] for item in artifacts.values()),
         "artifacts": artifacts,
     }
+
+
+@app.get("/metadata", response_model=MetadataResponse)
+def metadata() -> MetadataResponse:
+    return build_metadata_response()
 
 
 @app.post("/predict", response_model=PredictionResponse)
@@ -429,6 +692,56 @@ def predict(request: CampaignRequest) -> PredictionResponse:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         prediction_latency_seconds.observe(time.perf_counter() - start)
+
+
+@app.post("/predict/sweep", response_model=SweepResponse)
+def predict_sweep(request: SweepRequest) -> SweepResponse:
+    start = time.perf_counter()
+    sweep_id = str(uuid4())
+    try:
+        validate_sweep_point_count(request.cpm_range)
+        bundle = get_model_bundle()
+        points: list[SweepPoint] = []
+        for cpm in generate_sweep_cpms(request.cpm_range):
+            campaign_request = CampaignRequest(
+                cpm=cpm,
+                hour_start=request.base_request.hour_start,
+                hour_end=request.base_request.hour_end,
+                publishers=request.base_request.publishers,
+                audience_size=request.base_request.audience_size,
+                user_ids=request.base_request.user_ids,
+            )
+            values, drift_flag, _ = bundle.predict(campaign_request)
+            audience_size = request.base_request.audience_size
+            predicted_reach = int(round(audience_size * values["at_least_one"]))
+            points.append(
+                SweepPoint(
+                    cpm=cpm,
+                    at_least_one=values["at_least_one"],
+                    at_least_two=values["at_least_two"],
+                    at_least_three=values["at_least_three"],
+                    predicted_reach=predicted_reach,
+                    drift_flag=drift_flag,
+                )
+            )
+        return SweepResponse(
+            sweep_id=sweep_id,
+            points=points,
+            model_version=settings.model_version,
+            latency_seconds=round(time.perf_counter() - start, 3),
+        )
+    except ValueError as exc:
+        prediction_error_count.inc()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        prediction_error_count.inc()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except InferenceDependencyError as exc:
+        prediction_error_count.inc()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        prediction_error_count.inc()
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/predictions/recent")
