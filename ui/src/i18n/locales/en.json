@@ -1,0 +1,107 @@
+{
+  "app": {
+    "productName": "VK Ads Reach Intelligence",
+    "tagline": "Advertising reach forecasting for marketing and MLOps teams"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "systemStatus": "System status",
+    "openMenu": "Open navigation",
+    "closeMenu": "Close navigation"
+  },
+  "api": {
+    "connected": "API connected",
+    "disconnected": "API unavailable",
+    "checking": "Checking API…"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "ru": "Русский"
+  },
+  "dashboard": {
+    "heroTitle": "Reach intelligence at a glance",
+    "heroDescription": "Monitor model readiness, backend health, and configuration metadata before running campaign reach forecasts.",
+    "nextModuleTitle": "Campaign prediction",
+    "nextModuleDescription": "The interactive prediction workspace will arrive in the next release. It will use live reach forecasts once the model and artifacts are ready.",
+    "nextModuleBadge": "Coming soon"
+  },
+  "system": {
+    "title": "System status",
+    "description": "Detailed backend health, artifact checks, and service metadata for operations teams.",
+    "refresh": "Refresh data",
+    "lastUpdated": "Last updated",
+    "neverUpdated": "Not loaded yet"
+  },
+  "health": {
+    "title": "Backend health",
+    "status": "Service status",
+    "modelLoaded": "Model loaded in memory",
+    "modelReady": "Model ready for predictions",
+    "artifacts": "Required artifacts",
+    "statusOk": "Healthy",
+    "statusUnknown": "Unknown",
+    "loadedYes": "Yes",
+    "loadedNo": "No",
+    "readyYes": "Ready",
+    "readyNo": "Not ready"
+  },
+  "metadata": {
+    "title": "Service metadata",
+    "modelVersion": "Model version",
+    "modelLoaded": "Model loaded",
+    "modelReady": "Model ready",
+    "publisherUniverse": "Publisher catalog size",
+    "cpmSection": "CPM configuration",
+    "cpmMin": "Minimum CPM",
+    "cpmMax": "Maximum CPM",
+    "cpmStep": "CPM step",
+    "cpmMedian": "Median competitor CPM",
+    "cpmMaxCompetitor": "Max competitor CPM",
+    "cpmSource": "CPM data source",
+    "timeSection": "Campaign timing",
+    "timeMode": "Scheduling mode",
+    "timeMinHour": "Minimum hours",
+    "timeMaxHour": "Maximum hours",
+    "timePresets": "Recommended presets (hours)",
+    "timeSilence": "Session silence window (hours)",
+    "limitsSection": "Service limits",
+    "maxSweepPoints": "Max sweep points",
+    "maxRecentPredictions": "Max recent predictions stored",
+    "unavailable": "Not available",
+    "cpmSourceArtifact": "From training artifacts",
+    "cpmSourceConfig": "From environment configuration",
+    "cpmSourceUnavailable": "Unavailable"
+  },
+  "artifacts": {
+    "title": "Artifact status",
+    "name": "Artifact",
+    "path": "Path",
+    "exists": "Present",
+    "missing": "Missing",
+    "present": "Present"
+  },
+  "modelReadiness": {
+    "notReadyTitle": "Prediction model is not ready",
+    "notReadyDescription": "The prediction model is not available yet because required artifacts are missing or not loaded. Reach forecasts will be unavailable until all artifacts are present and the model is loaded.",
+    "loadedButNotReady": "The model file may be present, but supporting data artifacts are still missing.",
+    "publisherEmptyTitle": "Publisher metadata unavailable",
+    "publisherEmptyDescription": "Publisher metadata is not available. The prediction form will be limited until backend artifacts are available.",
+    "readyTitle": "Model is ready",
+    "readyDescription": "All required artifacts are present and the backend reports the model as ready for predictions."
+  },
+  "states": {
+    "loading": "Loading…",
+    "errorTitle": "Unable to load data",
+    "errorDescription": "We could not reach the backend. Check that the API is running and that VITE_API_BASE_URL is correct.",
+    "emptyTitle": "No data available",
+    "emptyDescription": "The backend responded without usable data for this section.",
+    "retry": "Try again"
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No",
+    "hours": "{{count}} h",
+    "count": "{{count}}"
+  }
+}
