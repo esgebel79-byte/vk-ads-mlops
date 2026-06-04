@@ -1,10 +1,16 @@
-import { LayoutDashboard, Server } from "lucide-react";
+import { History, LayoutDashboard, Server } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/shared/lib/cn";
 
 const navItems = [
   { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, end: true },
+  {
+    to: "/history",
+    labelKey: "nav.history",
+    icon: History,
+    end: false,
+  },
   {
     to: "/system",
     labelKey: "nav.systemStatus",

@@ -1,6 +1,6 @@
 # VK Ads Reach Intelligence — Frontend
 
-Phase 4 adds CPM sensitivity sweep, auction intelligence, and charting on top of Phase 3 campaign prediction.
+Phase 5 adds prediction history, CSV export, and enhanced system analytics on top of Phase 4 CPM sweep and auction intelligence.
 
 Integrated API endpoints:
 
@@ -8,6 +8,7 @@ Integrated API endpoints:
 - `POST /predict/sweep` — CPM range sweep using current campaign base parameters
 - `GET /health` — backend and model readiness
 - `GET /metadata` — CPM bounds, competitor thresholds, timing presets, publisher catalog, sweep limits
+- `GET /predictions/recent` — in-memory recent prediction history (items array)
 
 ## Stack
 
@@ -56,7 +57,7 @@ Dev server: [http://localhost:5173](http://localhost:5173). Ensure the backend a
 
 ### With backend
 
-From the repository root, start the inference API (see main project docs), then run the UI as above. The dashboard loads health/metadata, submits live `POST /predict` and `POST /predict/sweep` requests.
+From the repository root, start the inference API (see main project docs), then run the UI as above. The dashboard loads health/metadata, submits live predictions, and history/system pages load `/predictions/recent`.
 
 ## Scripts
 
@@ -69,76 +70,60 @@ From the repository root, start the inference API (see main project docs), then 
 | `npm run test` | Run Vitest once |
 | `npm run lint` | ESLint |
 
-## Phase 4 features
+## Phase 5 features
 
-- **CPM sweep panel** — configure min/max/step CPM range; uses current campaign form values (forecast duration, publishers, audience, user IDs) as `base_request`
-- **Recharts sweep chart** — toggle between predicted unique reach and impression probabilities; competitor threshold reference lines when metadata provides them
-- **Sweep summary cards** — best CPM by reach (lowest CPM on ties), highest reach, point count, model version, latency, drift-flagged points
-- **Auction intelligence panel** — guaranteed win, edge-rate, low competitiveness (only when thresholds exist), sweep drift warnings, session burnout note
-- **Two-column dashboard layout** — campaign form on the left; prediction results, sweep, and intelligence on the right (stacked on smaller screens)
+- **Prediction history page** (`/history`) — table of recent predictions with summary cards, client-side filters, sort, refresh, and CSV export
+- **`GET /predictions/recent` integration** — normalizes `{ items: [...] }` response; tolerates missing fields per record
+- **Details drawer** — campaign request, probabilities, reach, drift, latency, collapsible JSON for developers
+- **System analytics** — overview grid on System status: connection, model readiness, metadata, publisher count, CPM metadata, recent prediction metrics
+- **Recent activity panel** — aggregated history metrics with link to full history
+- **Refresh all** on System status — health, metadata, and recent predictions
 - **Bilingual UI** — all visible strings in `src/i18n/locales/en.json` and `ru.json`
 
-### Example sweep request
+### Recent predictions API shape
 
 ```json
 {
-  "base_request": {
-    "hour_start": 0,
-    "hour_end": 24,
-    "publishers": [101, 204],
-    "audience_size": 50000,
-    "user_ids": []
-  },
-  "cpm_range": {
-    "min": 5,
-    "max": 60,
-    "step": 5
-  }
-}
-```
-
-The UI builds `base_request` from the campaign form (forecast duration maps to `hour_end` with `hour_start: 0`).
-
-### Example sweep response
-
-```json
-{
-  "sweep_id": "uuid",
-  "points": [
+  "items": [
     {
-      "cpm": 5,
-      "at_least_one": 0.21,
-      "at_least_two": 0.08,
-      "at_least_three": 0.02,
-      "predicted_reach": 10500,
-      "drift_flag": false
+      "prediction_id": "uuid",
+      "created_at": "2025-06-01T12:00:00+00:00",
+      "request": { "cpm": 20, "hour_start": 0, "hour_end": 24, "publishers": [], "audience_size": 10000, "user_ids": [] },
+      "response": { "at_least_one": 0.25, "at_least_two": 0.1, "at_least_three": 0.02, "model_version": "...", "drift_flag": false, "prediction_id": "uuid" },
+      "latency_seconds": 0.42,
+      "drift_report": {}
     }
-  ],
-  "model_version": "deepsets_attention",
-  "latency_seconds": 1.23
+  ]
 }
 ```
 
-### Model unavailable behavior
+Sweep requests are not stored in this history (only `POST /predict` records).
 
-- If `model_ready` or `model_loaded` is false, a warning banner appears; forms and sweep controls remain visible.
-- `POST /predict` or `POST /predict/sweep` returning **503** shows a dedicated unavailable state with backend detail when present (no stack traces).
-- **422** and other errors use the shared error state with retry.
+### History filters and export
 
-### Auction intelligence limitations
+- Search by prediction ID (partial match)
+- Drift: all / drift only / no drift
+- Model version dropdown (from loaded records)
+- CPM min/max range
+- Sort: newest, oldest, highest/lowest CPM, highest reach, lowest latency
+- CSV export uses **filtered** rows; button disabled when empty or on load error
 
-- Competitor CPM win-rate guidance (guaranteed win, edge case, low competitiveness) requires both `median_competitor_cpm` and `max_competitor_cpm` in metadata with `source` not equal to `"unavailable"`.
-- When thresholds are missing, the UI shows an informational “limited intelligence” card and does not invent win probabilities.
-- Session burnout guidance uses `metadata.time.session_silence_window_hours` when available.
+### Empty and error states
 
-### Sweep validation
+- **Empty history** — when `items` is empty: guidance to run a campaign prediction on the dashboard
+- **API error** — shared error state with retry (no stack traces)
+- **Missing fields** — cells show translated “Unavailable” instead of crashing
+- **Partial records** — normalization skips completely empty entries; keeps partial data when possible
 
-- Client-side Zod checks: `min >= 0`, `max >= min`, `step > 0`, finite numbers, point count `floor((max - min) / step) + 1` ≤ `metadata.limits.max_sweep_points` (fallback max: 50).
+## Phase 4 features (summary)
+
+- CPM sweep panel, Recharts chart, auction intelligence, two-column dashboard layout
 
 ## Pages
 
-- `/` — Dashboard: model readiness, campaign prediction, CPM sweep, auction intelligence, compact system overview
-- `/system` — Full system status with refresh
+- `/` — Dashboard: model readiness, campaign prediction, CPM sweep, auction intelligence
+- `/history` — Prediction history with filters, export, and details drawer
+- `/system` — System status with analytics overview, recent activity, artifacts, metadata
 
 ## Testing
 
@@ -146,11 +131,11 @@ The UI builds `base_request` from the campaign form (forecast duration maps to `
 npm run test
 ```
 
-Unit tests mock API modules; no live backend is required. Coverage includes sweep controls validation, summary tie-breaking, auction intelligence scenarios, session burnout, dashboard render, and language switcher.
+Unit tests mock API modules; no live backend is required. Coverage includes history normalization, summary metrics, filtering, sorting, CSV export, history page empty state, details drawer, system recent activity panel, and language switcher.
 
 ## Limitations
 
-- No recent-predictions history UI (`GET /predictions/recent`)
+- History is in-memory on the backend and capped by `max_recent_predictions` (see metadata limits)
+- Only single `POST /predict` calls appear in history (not sweep points)
 - Publisher labels are IDs only (no fake names)
-- Chart and threshold markers only appear after a successful sweep or when metadata provides competitor CPM statistics
 - Requires `VITE_API_BASE_URL` at runtime

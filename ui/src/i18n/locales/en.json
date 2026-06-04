@@ -5,6 +5,7 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "history": "History",
     "systemStatus": "System status",
     "openMenu": "Open navigation",
     "closeMenu": "Close navigation"
@@ -193,6 +194,90 @@
       "sessionBurnoutTitle": "Session burnout",
       "sessionBurnoutDescription": "Ads already seen by a user in the same session may not be shown again until the {{hours}}-hour silence window expires. This can reduce final reach for long campaigns."
     }
+  },
+  "history": {
+    "title": "Prediction history",
+    "description": "Review recent campaign predictions stored by the inference API. Filter, inspect details, and export results for reporting.",
+    "refresh": "Refresh history",
+    "exportCsv": "Export CSV",
+    "unavailable": "Unavailable",
+    "noFilterResults": "No records match the current filters. Adjust filters or clear them to see more results.",
+    "empty": {
+      "title": "No prediction history yet",
+      "description": "No prediction history yet. Run a campaign prediction on the dashboard to create the first record."
+    },
+    "summary": {
+      "total": "Total recent predictions",
+      "avgLatency": "Average latency",
+      "driftWarnings": "Drift warnings",
+      "topModelVersion": "Most common model version",
+      "latestPrediction": "Latest prediction"
+    },
+    "filters": {
+      "title": "Filters",
+      "search": "Search prediction ID",
+      "searchPlaceholder": "Partial ID match…",
+      "drift": "Drift status",
+      "drift_all": "All",
+      "drift_drift": "Drift only",
+      "drift_no_drift": "No drift",
+      "modelVersion": "Model version",
+      "allVersions": "All versions",
+      "cpmMin": "Min CPM",
+      "cpmMax": "Max CPM",
+      "sort": "Sort by",
+      "sort_newest": "Newest first",
+      "sort_oldest": "Oldest first",
+      "sort_cpm_high": "Highest CPM",
+      "sort_cpm_low": "Lowest CPM",
+      "sort_reach_high": "Highest predicted reach",
+      "sort_latency_low": "Lowest latency"
+    },
+    "table": {
+      "predictionId": "Prediction ID",
+      "time": "Time",
+      "cpm": "CPM",
+      "duration": "Forecast duration",
+      "audience": "Audience size",
+      "reach": "Predicted reach",
+      "atLeastOne": "At least 1 impression",
+      "drift": "Drift",
+      "latency": "Latency",
+      "modelVersion": "Model version",
+      "actions": "Actions",
+      "viewDetails": "View details"
+    },
+    "drift": {
+      "yes": "Drift",
+      "no": "OK"
+    },
+    "details": {
+      "title": "Prediction details",
+      "close": "Close details",
+      "requestTitle": "Campaign request",
+      "responseTitle": "Model response",
+      "reachExplanation": "Estimated unique reach from audience size and at-least-one impression probability.",
+      "hourWindow": "Hour window",
+      "publishers": "Publishers",
+      "noPublishers": "None (broad targeting)",
+      "technicalToggle": "Technical details (JSON)"
+    }
+  },
+  "systemAnalytics": {
+    "panelTitle": "System analytics overview",
+    "connection": "Backend connection",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "metadataAvailable": "Metadata loaded",
+    "cpmMetadata": "CPM metadata available",
+    "recentPredictionCount": "Recent predictions",
+    "avgLatency": "Average latency (recent)",
+    "driftWarnings": "Drift warnings (recent)",
+    "lastPrediction": "Last successful prediction",
+    "recentActivityTitle": "Recent prediction activity",
+    "recentActivityDescription": "Aggregated metrics from stored prediction history.",
+    "viewHistory": "Open full history",
+    "refreshAll": "Refresh all"
   },
   "system": {
     "title": "System status",

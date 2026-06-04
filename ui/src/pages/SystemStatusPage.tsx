@@ -1,21 +1,23 @@
 import { RefreshCw } from "lucide-react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ArtifactStatusList } from "@/features/system/components/ArtifactStatusList";
-import { MetadataCard } from "@/features/system/components/MetadataCard";
+import { recentPredictionsQueryKey } from "@/features/history/hooks";
+import { ArtifactReadinessPanel } from "@/features/system/components/ArtifactReadinessPanel";
+import { ModelMetadataPanel } from "@/features/system/components/ModelMetadataPanel";
 import { ModelReadinessBanner } from "@/features/system/components/ModelReadinessBanner";
+import { RecentActivityPanel } from "@/features/system/components/RecentActivityPanel";
+import { SystemAnalyticsPanel } from "@/features/system/components/SystemAnalyticsPanel";
 import { useHealth, useMetadata } from "@/features/system/hooks";
-import { Card } from "@/shared/components/Card";
-import { ErrorState } from "@/shared/components/ErrorState";
-import { LoadingState } from "@/shared/components/LoadingState";
-import { StatusBadge } from "@/shared/components/StatusBadge";
+import { useQueryClient } from "@tanstack/react-query";
 import { formatDateTime } from "@/shared/lib/formatters";
 
 export function SystemStatusPage() {
   const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
   const health = useHealth();
   const metadata = useMetadata();
 
-  const lastUpdated = (() => {
+  const lastUpdated = useMemo(() => {
     const times = [health.dataUpdatedAt, metadata.dataUpdatedAt].filter(
       (v) => v > 0,
     );
@@ -23,14 +25,16 @@ export function SystemStatusPage() {
       return null;
     }
     return new Date(Math.max(...times));
-  })();
+  }, [health.dataUpdatedAt, metadata.dataUpdatedAt]);
 
-  const handleRefresh = () => {
+  const handleRefreshAll = () => {
     void health.refetch();
     void metadata.refetch();
+    void queryClient.invalidateQueries({ queryKey: recentPredictionsQueryKey });
   };
 
-  const isRefreshing = health.isFetching || metadata.isFetching;
+  const isRefreshing =
+    health.isFetching || metadata.isFetching;
 
   return (
     <div className="space-y-8">
@@ -46,7 +50,7 @@ export function SystemStatusPage() {
         <div className="flex flex-col items-end gap-2">
           <button
             type="button"
-            onClick={handleRefresh}
+            onClick={handleRefreshAll}
             disabled={isRefreshing}
             className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
           >
@@ -54,7 +58,7 @@ export function SystemStatusPage() {
               className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
               aria-hidden
             />
-            {t("system.refresh")}
+            {t("systemAnalytics.refreshAll")}
           </button>
           <p className="text-xs text-slate-500">
             {t("system.lastUpdated")}:{" "}
@@ -70,74 +74,10 @@ export function SystemStatusPage() {
         metadata={metadata.data}
       />
 
-      <Card title={t("health.title")}>
-        {health.isLoading ? <LoadingState /> : null}
-        {health.isError ? (
-          <ErrorState onRetry={() => void health.refetch()} />
-        ) : null}
-        {health.data ? (
-          <div className="space-y-6">
-            <dl className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  {t("health.status")}
-                </dt>
-                <dd className="mt-1">
-                  <StatusBadge
-                    label={
-                      health.data.status === "ok"
-                        ? t("health.statusOk")
-                        : t("health.statusUnknown")
-                    }
-                    variant={
-                      health.data.status === "ok" ? "success" : "warning"
-                    }
-                  />
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  {t("health.modelLoaded")}
-                </dt>
-                <dd className="mt-1">
-                  <StatusBadge
-                    label={
-                      health.data.model_loaded
-                        ? t("health.loadedYes")
-                        : t("health.loadedNo")
-                    }
-                    variant={health.data.model_loaded ? "success" : "neutral"}
-                  />
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  {t("health.modelReady")}
-                </dt>
-                <dd className="mt-1">
-                  <StatusBadge
-                    label={
-                      health.data.model_ready
-                        ? t("health.readyYes")
-                        : t("health.readyNo")
-                    }
-                    variant={health.data.model_ready ? "success" : "warning"}
-                  />
-                </dd>
-              </div>
-            </dl>
-
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-slate-800">
-                {t("artifacts.title")}
-              </h3>
-              <ArtifactStatusList artifacts={health.data.artifacts} />
-            </div>
-          </div>
-        ) : null}
-      </Card>
-
-      <MetadataCard />
+      <SystemAnalyticsPanel />
+      <RecentActivityPanel />
+      <ArtifactReadinessPanel />
+      <ModelMetadataPanel />
     </div>
   );
 }

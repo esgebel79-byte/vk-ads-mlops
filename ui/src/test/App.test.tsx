@@ -28,6 +28,10 @@ vi.mock("@/features/prediction/api", () => ({
   getPredictionErrorDetail: vi.fn(),
 }));
 
+vi.mock("@/features/history/api", () => ({
+  getRecentPredictions: vi.fn(() => Promise.resolve([])),
+}));
+
 vi.mock("@/features/system/api", () => ({
   getHealth: vi.fn(() =>
     Promise.resolve({

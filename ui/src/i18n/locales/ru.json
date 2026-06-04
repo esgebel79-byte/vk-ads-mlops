@@ -5,6 +5,7 @@
   },
   "nav": {
     "dashboard": "Обзор",
+    "history": "История",
     "systemStatus": "Состояние системы",
     "openMenu": "Открыть меню",
     "closeMenu": "Закрыть меню"
@@ -193,6 +194,90 @@
       "sessionBurnoutTitle": "Выгорание сессии",
       "sessionBurnoutDescription": "Реклама, уже показанная пользователю в той же сессии, может не показываться снова, пока не истечёт окно тишины {{hours}} ч. Это может снизить итоговый охват длинных кампаний."
     }
+  },
+  "history": {
+    "title": "История прогнозов",
+    "description": "Просмотр недавних прогнозов кампаний, сохранённых inference API. Фильтрация, детали и экспорт для отчётности.",
+    "refresh": "Обновить историю",
+    "exportCsv": "Экспорт CSV",
+    "unavailable": "Недоступно",
+    "noFilterResults": "Нет записей по текущим фильтрам. Измените фильтры или сбросьте их.",
+    "empty": {
+      "title": "История прогнозов пуста",
+      "description": "История пока пуста. Запустите прогноз кампании на панели обзора, чтобы создать первую запись."
+    },
+    "summary": {
+      "total": "Всего недавних прогнозов",
+      "avgLatency": "Средняя задержка",
+      "driftWarnings": "Предупреждения о дрейфе",
+      "topModelVersion": "Чаще всего версия модели",
+      "latestPrediction": "Последний прогноз"
+    },
+    "filters": {
+      "title": "Фильтры",
+      "search": "Поиск по ID прогноза",
+      "searchPlaceholder": "Часть ID…",
+      "drift": "Статус дрейфа",
+      "drift_all": "Все",
+      "drift_drift": "Только дрейф",
+      "drift_no_drift": "Без дрейфа",
+      "modelVersion": "Версия модели",
+      "allVersions": "Все версии",
+      "cpmMin": "Мин. CPM",
+      "cpmMax": "Макс. CPM",
+      "sort": "Сортировка",
+      "sort_newest": "Сначала новые",
+      "sort_oldest": "Сначала старые",
+      "sort_cpm_high": "Макс. CPM",
+      "sort_cpm_low": "Мин. CPM",
+      "sort_reach_high": "Макс. охват",
+      "sort_latency_low": "Мин. задержка"
+    },
+    "table": {
+      "predictionId": "ID прогноза",
+      "time": "Время",
+      "cpm": "CPM",
+      "duration": "Длительность прогноза",
+      "audience": "Размер аудитории",
+      "reach": "Прогноз охвата",
+      "atLeastOne": "≥ 1 показ",
+      "drift": "Дрейф",
+      "latency": "Задержка",
+      "modelVersion": "Версия модели",
+      "actions": "Действия",
+      "viewDetails": "Подробнее"
+    },
+    "drift": {
+      "yes": "Дрейф",
+      "no": "ОК"
+    },
+    "details": {
+      "title": "Детали прогноза",
+      "close": "Закрыть",
+      "requestTitle": "Запрос кампании",
+      "responseTitle": "Ответ модели",
+      "reachExplanation": "Оценка уникального охвата: размер аудитории × вероятность ≥ 1 показа.",
+      "hourWindow": "Часовое окно",
+      "publishers": "Паблишеры",
+      "noPublishers": "Нет (широкий таргетинг)",
+      "technicalToggle": "Технические детали (JSON)"
+    }
+  },
+  "systemAnalytics": {
+    "panelTitle": "Обзор аналитики системы",
+    "connection": "Подключение к бэкенду",
+    "connected": "Подключено",
+    "disconnected": "Нет связи",
+    "metadataAvailable": "Метаданные загружены",
+    "cpmMetadata": "Метаданные CPM доступны",
+    "recentPredictionCount": "Недавние прогнозы",
+    "avgLatency": "Средняя задержка (недавние)",
+    "driftWarnings": "Предупреждения о дрейфе (недавние)",
+    "lastPrediction": "Последний успешный прогноз",
+    "recentActivityTitle": "Недавняя активность прогнозов",
+    "recentActivityDescription": "Сводные метрики из сохранённой истории прогнозов.",
+    "viewHistory": "Открыть полную историю",
+    "refreshAll": "Обновить всё"
   },
   "system": {
     "title": "Состояние системы",
