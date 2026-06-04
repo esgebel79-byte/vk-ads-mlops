@@ -11,6 +11,22 @@ import { EmptyState } from "@/shared/components/EmptyState";
 import { ErrorState } from "@/shared/components/ErrorState";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 
+vi.mock("@/features/prediction/api", () => ({
+  predictCampaign: vi.fn(),
+  HttpError: class HttpError extends Error {
+    status: number;
+    body: unknown;
+    constructor(message: string, status: number, body: unknown) {
+      super(message);
+      this.status = status;
+      this.body = body;
+    }
+  },
+  isModelUnavailableError: vi.fn(() => false),
+  isValidationError: vi.fn(() => false),
+  getPredictionErrorDetail: vi.fn(),
+}));
+
 vi.mock("@/features/system/api", () => ({
   getHealth: vi.fn(() =>
     Promise.resolve({
@@ -71,7 +87,7 @@ describe("App", () => {
     render(<App />);
     expect(
       await screen.findByRole("heading", {
-        name: "Reach intelligence at a glance",
+        name: "Campaign reach forecasting",
       }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("VK Ads Reach Intelligence").length).toBeGreaterThan(
@@ -88,7 +104,7 @@ describe("App", () => {
   it("shows dashboard hero title", async () => {
     renderWithProviders(<DashboardPage />);
     expect(
-      await screen.findByRole("heading", { name: "Reach intelligence at a glance" }),
+      await screen.findByRole("heading", { name: "Campaign reach forecasting" }),
     ).toBeInTheDocument();
   });
 

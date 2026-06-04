@@ -20,11 +20,97 @@
     "ru": "Русский"
   },
   "dashboard": {
-    "heroTitle": "Reach intelligence at a glance",
-    "heroDescription": "Monitor model readiness, backend health, and configuration metadata before running campaign reach forecasts.",
-    "nextModuleTitle": "Campaign prediction",
-    "nextModuleDescription": "The interactive prediction workspace will arrive in the next release. It will use live reach forecasts once the model and artifacts are ready.",
-    "nextModuleBadge": "Coming soon"
+    "heroTitle": "Campaign reach forecasting",
+    "heroDescription": "Configure your campaign inputs and calculate predicted unique reach using the live inference model.",
+    "overviewTitle": "System overview",
+    "overviewDescription": "Quick health and metadata summary for operators. Use System status for full detail."
+  },
+  "prediction": {
+    "panel": {
+      "title": "Campaign prediction",
+      "description": "Enter CPM, forecast window, audience size, and optional targeting to generate impression probabilities and estimated unique reach."
+    },
+    "form": {
+      "cardTitle": "Campaign inputs",
+      "cardDescription": "All fields map directly to the prediction API. Forecast duration starts at hour 0 automatically.",
+      "cpmLabel": "CPM (cost per mille)",
+      "cpmHelper": "CPM is what you pay per 1,000 ad impressions. Higher CPM generally improves auction competitiveness.",
+      "forecastLabel": "Forecast duration",
+      "forecastHelper": "How long the campaign is expected to run, in hours from the start of the window.",
+      "audienceLabel": "Audience size",
+      "audienceHelper": "Total audience size used as the reach denominator for unique reach estimation.",
+      "publishersLabel": "Publishers",
+      "publishersHelper": "Select one or more publishers when the catalog is available from backend metadata.",
+      "publisherItem": "Publisher {{id}}",
+      "publishersUnavailableTitle": "Publisher catalog unavailable",
+      "publishersUnavailableDescription": "Publisher metadata is not available. The request will be sent without publisher filtering.",
+      "advancedTitle": "Advanced targeting options",
+      "userIdsLabel": "User IDs (optional)",
+      "userIdsPlaceholder": "e.g. 1001, 1002, 1003",
+      "userIdsHelper": "Comma-separated integer user IDs for technical or testing scenarios. Leave empty for broad audience targeting.",
+      "submit": "Calculate prediction",
+      "submitting": "Calculating…",
+      "reset": "Clear form"
+    },
+    "validation": {
+      "generic": "Please check this field.",
+      "required": "This field is required.",
+      "cpm_negative": "CPM cannot be negative.",
+      "invalid_preset": "Select a valid forecast duration.",
+      "audience_integer": "Audience size must be a whole number.",
+      "audience_min": "Audience size must be at least 1.",
+      "audience_vs_users": "Audience size must be greater than or equal to the number of user IDs.",
+      "user_ids_invalid": "User IDs must be comma-separated integers.",
+      "publishers_required": "Select at least one publisher.",
+      "publishers_invalid": "One or more selected publishers are not in the catalog."
+    },
+    "results": {
+      "summaryTitle": "Prediction summary",
+      "summaryDescription": "Estimated unique reach based on your audience size and the model output.",
+      "uniqueReach": "Predicted unique reach",
+      "uniqueReachFormula": "Calculated as audience size × probability of at least one impression.",
+      "modelVersion": "Model version",
+      "predictionId": "Prediction ID",
+      "atLeastOne": "At least 1 impression",
+      "atLeastTwo": "At least 2 impressions",
+      "atLeastThree": "At least 3 impressions"
+    },
+    "breakdown": {
+      "title": "What these probabilities mean",
+      "description": "Plain-language interpretation for marketing teams.",
+      "atLeastOne": "At least 1 impression — the chance a typical user in your audience sees your ad at least once during the forecast window.",
+      "atLeastTwo": "At least 2 impressions — the chance a user receives two or more impressions (frequency).",
+      "atLeastThree": "At least 3 impressions — the chance a user receives three or more impressions (higher frequency)."
+    },
+    "alerts": {
+      "formModelNotReady": "The prediction model is not ready. Calculation may fail until required artifacts are available.",
+      "modelNotReadyTitle": "Predictions may be unavailable",
+      "modelNotReadyDescription": "The backend reports the model is not ready. Results may fail until artifacts are loaded.",
+      "metadataUnavailableTitle": "Metadata unavailable",
+      "metadataUnavailableDescription": "Service metadata could not be loaded. Form defaults and alerts may be limited.",
+      "publisherEmptyTitle": "No publisher catalog",
+      "publisherEmptyDescription": "Publisher metadata is empty. Requests will be sent without publisher filtering.",
+      "sessionSilenceTitle": "Session silence window",
+      "sessionSilenceDescription": "The model applies a {{hours}}-hour session silence window when scoring engagement timing.",
+      "driftTitle": "Distribution drift detected",
+      "driftDescription": "This campaign configuration may be outside the model's typical training distribution. Interpret results with extra care.",
+      "cpmGuaranteedWinTitle": "Likely guaranteed auction win",
+      "cpmGuaranteedWinDescription": "Your CPM is above the maximum competitor CPM from metadata, which often indicates a likely guaranteed auction win.",
+      "cpmEdgeCaseTitle": "CPM at competitor ceiling",
+      "cpmEdgeCaseDescription": "Your CPM is approximately equal to the maximum competitor CPM. Auction outcomes may be uncertain (~50% win scenarios).",
+      "cpmLowTitle": "Low auction competitiveness",
+      "cpmLowDescription": "Your CPM is below the median competitor CPM. Reach may be limited unless you increase bid competitiveness.",
+      "cpmThresholdsUnavailableTitle": "Competitor CPM thresholds unavailable",
+      "cpmThresholdsUnavailableDescription": "Competitor CPM thresholds are not available from backend metadata."
+    },
+    "unavailable": {
+      "title": "Prediction service unavailable",
+      "description": "Prediction service is unavailable because model artifacts are missing or not loaded."
+    },
+    "errors": {
+      "validationTitle": "Invalid campaign inputs",
+      "genericTitle": "Prediction failed"
+    }
   },
   "system": {
     "title": "System status",

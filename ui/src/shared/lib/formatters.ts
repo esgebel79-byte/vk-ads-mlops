@@ -37,6 +37,18 @@ export function formatOptionalNumber(
   return formatNumber(value, locale, { maximumFractionDigits: 4 });
 }
 
+export function formatPercent(
+  value: number,
+  locale: string,
+  fractionDigits = 1,
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "percent",
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
+}
+
 export function formatList(
   values: number[],
   locale: string,

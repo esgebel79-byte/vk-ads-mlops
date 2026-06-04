@@ -1,18 +1,20 @@
 # VK Ads Reach Intelligence — Frontend
 
-Phase 2 frontend for the VK Ads reach prediction MLOps platform. This release connects only to:
+Phase 3 adds the campaign prediction workspace and integrates:
 
-- `GET /health`
-- `GET /metadata`
+- `POST /predict` — campaign reach forecast
+- `GET /health` — backend and model readiness
+- `GET /metadata` — CPM, timing presets, publisher catalog, limits
 
-Prediction, sweep, and recent-prediction endpoints are planned for later phases.
+Sweep and recent-predictions views remain out of scope.
 
 ## Stack
 
 - Vite
 - React 18 + TypeScript (strict)
 - Tailwind CSS
-- TanStack Query (server state)
+- TanStack Query (queries + mutations)
+- React Hook Form + Zod
 - React Router
 - i18next + react-i18next (English / Russian)
 - lucide-react icons
@@ -24,8 +26,6 @@ Prediction, sweep, and recent-prediction endpoints are planned for later phases.
 - Backend inference API running (default `http://127.0.0.1:8000`)
 
 ## Environment
-
-Copy the example env file and adjust if needed:
 
 ```bash
 cp .env.example .env
@@ -50,22 +50,55 @@ cp .env.example .env
 npm run dev
 ```
 
-The dev server runs at [http://localhost:5173](http://localhost:5173) by default. Ensure the backend allows this origin (CORS is preconfigured in the inference API).
+Dev server: [http://localhost:5173](http://localhost:5173). Ensure the backend allows this origin (CORS is configured in the inference API).
+
+### With backend
+
+From the repository root, start the inference API (see main project docs), then run the UI as above. The dashboard loads health/metadata and submits live `POST /predict` requests.
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
+| `npm install` | Install dependencies |
 | `npm run dev` | Start Vite dev server |
 | `npm run build` | Typecheck and production build |
 | `npm run preview` | Preview production build |
 | `npm run test` | Run Vitest once |
-| `npm run lint` | ESLint (if dependencies installed) |
+| `npm run lint` | ESLint |
+
+## Phase 3 features
+
+- **Campaign prediction panel** on the dashboard: CPM, forecast duration (from metadata presets or defaults), publisher multi-select, audience size, optional user IDs
+- **Results**: predicted unique reach (`audience_size × at_least_one`), impression probabilities, model version, prediction ID
+- **Alerts**: drift, model readiness, metadata/publisher gaps, session silence window, competitor CPM thresholds (only when provided by metadata)
+- **Bilingual UI** — all visible strings in `src/i18n/locales/en.json` and `ru.json`
+
+### Example predict request
+
+```json
+{
+  "cpm": 12.5,
+  "hour_start": 0,
+  "hour_end": 24,
+  "publishers": [101, 204],
+  "audience_size": 50000,
+  "user_ids": []
+}
+```
+
+The form maps **forecast duration** to `hour_start: 0` and `hour_end: <selected hours>`.
+
+### Model unavailable behavior
+
+- If `model_ready` or `model_loaded` is false, a warning banner appears; the form stays usable.
+- `POST /predict` returning **503** shows a dedicated unavailable state with backend detail when present (no stack traces).
+- **422** and other errors use the shared error state with retry.
 
 ## Pages
 
-- `/` — Dashboard with model readiness, health, metadata, and next-module placeholder
-- `/system` — Detailed system status with refresh and last-updated timestamp
+- `/` — Dashboard: model readiness, campaign prediction (primary), compact system overview
+- `/system` — Full system status with refresh
 
 ## Testing
 
@@ -73,12 +106,11 @@ The dev server runs at [http://localhost:5173](http://localhost:5173) by default
 npm run test
 ```
 
-## Expected backend
+Unit tests mock API modules; no live backend is required. Coverage includes form validation, user ID parsing, result percentages, unavailable state, dashboard render, and language switcher.
 
-Start the inference API from the repository root (see main project docs), for example on port `8000`. The UI reads live data only; it does not mock predictions or charts in this phase.
+## Limitations
 
-## Limitations (Phase 2)
-
-- No campaign prediction UI
-- No sweep or recent-predictions views
-- Requires a reachable API for full content; otherwise shows loading/error states
+- No CPM sweep or recent-predictions UI
+- Publisher labels are IDs only (no fake names)
+- Competitor CPM alerts require both median and max from metadata
+- Requires `VITE_API_BASE_URL` at runtime

@@ -1,11 +1,9 @@
-import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { CampaignPredictionPanel } from "@/features/prediction/components/CampaignPredictionPanel";
 import { HealthStatusCard } from "@/features/system/components/HealthStatusCard";
 import { MetadataCard } from "@/features/system/components/MetadataCard";
 import { ModelReadinessBanner } from "@/features/system/components/ModelReadinessBanner";
 import { useHealth, useMetadata } from "@/features/system/hooks";
-import { Card } from "@/shared/components/Card";
-import { StatusBadge } from "@/shared/components/StatusBadge";
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -14,17 +12,16 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-2xl border border-surface-border bg-gradient-to-br from-brand-950 via-brand-900 to-slate-900 px-6 py-8 text-white shadow-card lg:px-8">
+      <section className="rounded-2xl border border-surface-border bg-gradient-to-br from-brand-950 via-brand-900 to-slate-900 px-6 py-6 text-white shadow-card lg:px-8">
         <p className="text-xs font-semibold uppercase tracking-widest text-brand-200">
           {t("app.productName")}
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
           {t("dashboard.heroTitle")}
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-brand-100/90 sm:text-base">
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-brand-100/90">
           {t("dashboard.heroDescription")}
         </p>
-        <p className="mt-4 text-sm text-brand-200/80">{t("app.tagline")}</p>
       </section>
 
       <ModelReadinessBanner
@@ -32,26 +29,22 @@ export function DashboardPage() {
         metadata={metadata.data}
       />
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <HealthStatusCard />
-        <MetadataCard />
-      </div>
+      <CampaignPredictionPanel />
 
-      <Card
-        title={t("dashboard.nextModuleTitle")}
-        description={t("dashboard.nextModuleDescription")}
-        action={
-          <StatusBadge
-            label={t("dashboard.nextModuleBadge")}
-            variant="info"
-          />
-        }
-      >
-        <div className="flex items-center gap-3 rounded-lg border border-dashed border-surface-border bg-surface-muted/40 px-4 py-6 text-slate-600">
-          <Sparkles className="h-5 w-5 shrink-0 text-brand-500" aria-hidden />
-          <p className="text-sm">{t("dashboard.nextModuleDescription")}</p>
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            {t("dashboard.overviewTitle")}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {t("dashboard.overviewDescription")}
+          </p>
         </div>
-      </Card>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <HealthStatusCard />
+          <MetadataCard />
+        </div>
+      </section>
     </div>
   );
 }
