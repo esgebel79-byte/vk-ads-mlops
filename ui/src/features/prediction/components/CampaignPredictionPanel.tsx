@@ -11,6 +11,7 @@ import { usePredictCampaign, usePredictCpmSweep } from "../hooks";
 import type { CampaignFormInput } from "../schema";
 import type { CampaignRequest } from "../types";
 import { AuctionIntelligencePanel } from "./AuctionIntelligencePanel";
+import { WinProbabilityIndicator } from "./WinProbabilityIndicator";
 import { CampaignForm } from "./CampaignForm";
 import { CpmSweepPanel } from "./CpmSweepPanel";
 import { PredictionAlerts } from "./PredictionAlerts";
@@ -121,6 +122,11 @@ export function CampaignPredictionPanel() {
             response={predict.data}
             modelReady={modelReady}
             publisherUniverseEmpty={publisherEmpty}
+          />
+
+          <WinProbabilityIndicator
+            cpm={selectedCpm}
+            cpmMeta={metadata.data?.cpm}
           />
 
           {predict.isPending ? (

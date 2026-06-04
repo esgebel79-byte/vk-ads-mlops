@@ -1,6 +1,7 @@
 import type { UseFormRegister } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import type { CampaignFormInput } from "../schema";
+import { FieldHelp } from "@/shared/components/FieldHelp";
 import { cn } from "@/shared/lib/cn";
 
 type CpmInputProps = {
@@ -16,9 +17,12 @@ export function CpmInput({ register, errorMessage, min, max, step }: CpmInputPro
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor="cpm" className="text-sm font-medium text-slate-900">
-        {t("prediction.form.cpmLabel")}
-      </label>
+      <div className="flex items-center gap-1.5">
+        <label htmlFor="cpm" className="text-sm font-medium text-slate-900">
+          {t("prediction.form.cpmLabel")}
+        </label>
+        <FieldHelp text={t("prediction.form.cpmTooltip")} />
+      </div>
       <input
         id="cpm"
         type="number"

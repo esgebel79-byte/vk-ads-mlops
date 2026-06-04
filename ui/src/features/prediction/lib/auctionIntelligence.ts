@@ -69,13 +69,80 @@ export function resolveSweepDriftInsight(
   return { kind: "drift", status: "warning" };
 }
 
-export function resolveSessionBurnoutInsight(
+export const DEFAULT_SESSION_SILENCE_HOURS = 6;
+
+export function resolveSessionSilenceHours(
   sessionSilenceHours: number | undefined,
-): AuctionInsight | null {
-  if (sessionSilenceHours == null || sessionSilenceHours <= 0) {
-    return null;
+): number {
+  if (sessionSilenceHours != null && sessionSilenceHours > 0) {
+    return sessionSilenceHours;
   }
+  return DEFAULT_SESSION_SILENCE_HOURS;
+}
+
+export function resolveSessionBurnoutInsight(
+  _sessionSilenceHours?: number | undefined,
+): AuctionInsight {
   return { kind: "session_burnout", status: "info" };
+}
+
+export type WinProbabilityState =
+  | "guaranteed"
+  | "edge"
+  | "low"
+  | "unknown"
+  | "neutral";
+
+export type WinProbabilityResult = {
+  state: WinProbabilityState;
+  displayPercent: number | null;
+  insightKind: AuctionInsightKind;
+};
+
+export function resolveWinProbability(
+  cpm: number,
+  cpmMeta: CpmMetadata | undefined,
+): WinProbabilityResult {
+  if (!areCpmThresholdsAvailable(cpmMeta)) {
+    return {
+      state: "unknown",
+      displayPercent: null,
+      insightKind: "thresholds_unavailable",
+    };
+  }
+
+  const median = cpmMeta!.median_competitor_cpm!;
+  const max = cpmMeta!.max_competitor_cpm!;
+
+  if (cpm > max) {
+    return {
+      state: "guaranteed",
+      displayPercent: 100,
+      insightKind: "guaranteed_win",
+    };
+  }
+
+  if (cpmApproxEqualsMax(cpm, max)) {
+    return {
+      state: "edge",
+      displayPercent: 50,
+      insightKind: "edge_case",
+    };
+  }
+
+  if (cpm < median) {
+    return {
+      state: "low",
+      displayPercent: null,
+      insightKind: "low_competitiveness",
+    };
+  }
+
+  return {
+    state: "neutral",
+    displayPercent: null,
+    insightKind: null,
+  };
 }
 
 export function buildAuctionInsights(params: {
@@ -96,10 +163,7 @@ export function buildAuctionInsights(params: {
     insights.push(drift);
   }
 
-  const session = resolveSessionBurnoutInsight(params.sessionSilenceHours);
-  if (session) {
-    insights.push(session);
-  }
+  insights.push(resolveSessionBurnoutInsight(params.sessionSilenceHours));
 
   return insights;
 }

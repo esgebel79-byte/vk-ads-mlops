@@ -8,6 +8,13 @@ import {
   type CpmSweepRequest,
 } from "./types";
 
+export function resolveCpmInputStep(step: number | undefined): number {
+  if (step === 0.1 || step === 1) {
+    return step;
+  }
+  return 0.1;
+}
+
 export function parseUserIdsRaw(raw: string): number[] {
   const trimmed = raw.trim();
   if (!trimmed) {

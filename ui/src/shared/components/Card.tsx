@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/cn";
 
 type CardProps = {
-  title?: string;
+  title?: ReactNode;
   description?: string;
   children: ReactNode;
   className?: string;

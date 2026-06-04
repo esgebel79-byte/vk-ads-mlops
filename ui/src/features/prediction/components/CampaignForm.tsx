@@ -7,6 +7,7 @@ import {
   createCampaignFormSchema,
   defaultCampaignFormValues,
   formValuesToCampaignRequest,
+  resolveCpmInputStep,
   type CampaignFormInput,
 } from "../schema";
 import { DEFAULT_FORECAST_PRESETS } from "../types";
@@ -70,6 +71,7 @@ export function CampaignForm({
     watch,
     setValue,
     reset,
+    trigger,
     formState: { errors, isValid },
   } = useForm<CampaignFormInput>({
     resolver: zodResolver(schema),
@@ -83,6 +85,12 @@ export function CampaignForm({
 
   const cpmValue = watch("cpm");
   const watchedValues = watch();
+
+  useEffect(() => {
+    if (publisherUniverse.length > 0) {
+      void trigger("publishers");
+    }
+  }, [publisherUniverse.length, trigger]);
 
   useEffect(() => {
     if (typeof cpmValue === "number" && !Number.isNaN(cpmValue)) {
@@ -115,7 +123,7 @@ export function CampaignForm({
           errorMessage={errors.cpm?.message}
           min={metadata?.cpm.min}
           max={metadata?.cpm.max}
-          step={metadata?.cpm.step}
+          step={resolveCpmInputStep(metadata?.cpm.step)}
         />
         <div className="space-y-1.5">
           <label

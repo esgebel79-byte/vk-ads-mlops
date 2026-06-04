@@ -2,7 +2,9 @@ import { AlertTriangle, Info } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { MetadataResponse } from "@/features/system/types";
 import type { PredictionResponse } from "../types";
+import { resolveSessionSilenceHours } from "../lib/auctionIntelligence";
 import { resolveCpmAlertKind, type CpmAlertKind } from "../lib/alerts";
+import { FieldHelp } from "@/shared/components/FieldHelp";
 import { cn } from "@/shared/lib/cn";
 
 type PredictionAlertsProps = {
@@ -92,17 +94,17 @@ export function PredictionAlerts({
     });
   }
 
-  const silenceHours = metadata?.time.session_silence_window_hours;
-  if (silenceHours != null && silenceHours > 0) {
-    alerts.push({
-      id: "session-silence",
-      variant: "info",
-      title: t("prediction.alerts.sessionSilenceTitle"),
-      description: t("prediction.alerts.sessionSilenceDescription", {
-        hours: silenceHours,
-      }),
-    });
-  }
+  const silenceHours = resolveSessionSilenceHours(
+    metadata?.time.session_silence_window_hours,
+  );
+  alerts.push({
+    id: "session-silence",
+    variant: "info",
+    title: t("prediction.alerts.sessionSilenceTitle"),
+    description: t("prediction.alerts.sessionSilenceDescription", {
+      hours: silenceHours,
+    }),
+  });
 
   const cpmKind = resolveCpmAlertKind(cpm, metadata?.cpm);
   const cpmCopy = cpmAlertCopy(cpmKind, t);
@@ -149,8 +151,16 @@ export function PredictionAlerts({
               )}
               aria-hidden
             />
-            <div>
-              <p className="text-sm font-semibold text-slate-900">{alert.title}</p>
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+                {alert.title}
+                {alert.id === "session-silence" ? (
+                  <FieldHelp text={t("prediction.alerts.sessionSilenceHelp")} />
+                ) : null}
+                {alert.id === "drift" ? (
+                  <FieldHelp text={t("prediction.alerts.driftHelp")} />
+                ) : null}
+              </p>
               <p className="mt-1 text-sm text-slate-600">{alert.description}</p>
             </div>
           </div>

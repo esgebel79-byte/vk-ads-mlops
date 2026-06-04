@@ -1,6 +1,7 @@
 import type { UseFormSetValue, UseFormWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import type { CampaignFormInput } from "../schema";
+import { FieldHelp } from "@/shared/components/FieldHelp";
 import { cn } from "@/shared/lib/cn";
 
 type PublisherSelectorProps = {
@@ -41,9 +42,12 @@ export function PublisherSelector({
 
   return (
     <div className="space-y-2">
-      <span className="text-sm font-medium text-slate-900">
-        {t("prediction.form.publishersLabel")}
-      </span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm font-medium text-slate-900">
+          {t("prediction.form.publishersLabel")}
+        </span>
+        <FieldHelp text={t("prediction.form.publishersTooltip")} />
+      </div>
       <p className="text-xs text-slate-500">
         {t("prediction.form.publishersHelper")}
       </p>

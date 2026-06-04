@@ -155,7 +155,7 @@ describe("AuctionIntelligencePanel", () => {
     );
     expect(screen.getByText("Session burnout")).toBeInTheDocument();
     expect(
-      screen.getByText(/4-hour silence window/),
+      screen.getByText(/4-hour inactivity window expires/),
     ).toBeInTheDocument();
   });
 });
@@ -172,6 +172,14 @@ describe("auction intelligence helpers", () => {
       cpm: 15,
       cpmMeta: metadataFixture.cpm,
       sessionSilenceHours: 4,
+    });
+    expect(insights.some((i) => i.kind === "session_burnout")).toBe(true);
+  });
+
+  it("includes session burnout with default hours when metadata is missing", () => {
+    const insights = buildAuctionInsights({
+      cpm: 15,
+      cpmMeta: metadataFixture.cpm,
     });
     expect(insights.some((i) => i.kind === "session_burnout")).toBe(true);
   });

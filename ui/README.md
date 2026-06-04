@@ -1,6 +1,6 @@
 # VK Ads Reach Intelligence — Frontend
 
-Phase 5 adds prediction history, CSV export, and enhanced system analytics on top of Phase 4 CPM sweep and auction intelligence.
+Phase 5.5 applies supervisor UI requirements compliance before Docker integration. Phase 5 adds prediction history, CSV export, and enhanced system analytics on top of Phase 4 CPM sweep and auction intelligence.
 
 Integrated API endpoints:
 
@@ -99,6 +99,38 @@ From the repository root, start the inference API (see main project docs), then 
 
 Sweep requests are not stored in this history (only `POST /predict` records).
 
+## Requirements compliance (Phase 5.5)
+
+The dashboard is organized into three supervisor blocks:
+
+### Block A — Campaign inputs
+
+- CPM, target segment / publisher group, forecast duration, audience size, and calculate button
+- Segments are labeled in marketer-friendly language; backend publisher IDs render as “Publisher 101” / “Площадка 101”
+- Segment selection is **required** when `metadata.publisher_universe` has items; when empty, a warning is shown and `publishers: []` is allowed
+- Main CPM input step uses `metadata.cpm.step` only when it is `0.1` or `1`; otherwise falls back to `0.1` (sweep step remains separate)
+
+### Block B — Prediction visualization
+
+- Predicted unique reach, probability cards, CPM sweep chart, and **Winning probability** indicator (progress bar + status badge)
+- Win probability uses competitor thresholds from `metadata.cpm` (max for guaranteed/edge, median for low competitiveness)
+- When model artifacts are missing (503), polished unavailable states are shown — no mock chart or prediction data
+
+### Block C — Auction and session alerts
+
+- Smart notifications for guaranteed win, edge-rate (~50%), low competitiveness, drift, and session burnout
+- Session limitation explains that ads are not repeated in the same session; hours come from `metadata.time.session_silence_window_hours`, with **6 hours** as explanatory fallback when metadata is missing
+
+### Metadata and artifacts unavailable
+
+- Empty `publisher_universe`: warning + optional broad targeting (no fake publisher names)
+- Missing competitor CPM thresholds: win probability shows “unknown” — no fake 100% or 50%
+- Model not ready: form warning and unavailable result/sweep states
+
+### English / Russian
+
+All visible UI strings live in `src/i18n/locales/en.json` and `ru.json`. Use the header language switcher to toggle locales.
+
 ### History filters and export
 
 - Search by prediction ID (partial match)
@@ -131,7 +163,7 @@ Sweep requests are not stored in this history (only `POST /predict` records).
 npm run test
 ```
 
-Unit tests mock API modules; no live backend is required. Coverage includes history normalization, summary metrics, filtering, sorting, CSV export, history page empty state, details drawer, system recent activity panel, and language switcher.
+Unit tests mock API modules; no live backend is required. Coverage includes requirements compliance (segment labels/validation, CPM step, win probability indicator, session burnout), history normalization, summary metrics, filtering, sorting, CSV export, history page empty state, details drawer, system recent activity panel, and language switcher.
 
 ## Limitations
 

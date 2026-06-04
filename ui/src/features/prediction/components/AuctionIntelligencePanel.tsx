@@ -10,9 +10,11 @@ import type { MetadataResponse } from "@/features/system/types";
 import type { CpmSweepPoint } from "../types";
 import {
   buildAuctionInsights,
+  resolveSessionSilenceHours,
   type AuctionInsight,
   type AuctionInsightStatus,
 } from "../lib/auctionIntelligence";
+import { FieldHelp } from "@/shared/components/FieldHelp";
 import { Card } from "@/shared/components/Card";
 import { cn } from "@/shared/lib/cn";
 
@@ -111,7 +113,9 @@ export function AuctionIntelligencePanel({
     [cpm, metadata, sweepPoints],
   );
 
-  const sessionHours = metadata?.time.session_silence_window_hours;
+  const sessionHours = resolveSessionSilenceHours(
+    metadata?.time.session_silence_window_hours,
+  );
 
   return (
     <Card
@@ -138,7 +142,7 @@ export function AuctionIntelligencePanel({
             const style = statusStyles[insight.status];
             const Icon = style.icon;
             const description =
-              insight.kind === "session_burnout" && sessionHours != null
+              insight.kind === "session_burnout"
                 ? t("prediction.auction.sessionBurnoutDescription", {
                     hours: sessionHours,
                   })
@@ -165,9 +169,17 @@ export function AuctionIntelligencePanel({
                   )}
                   aria-hidden
                 />
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
                     {copy.title}
+                    {insight.kind === "session_burnout" ? (
+                      <FieldHelp
+                        text={t("prediction.auction.sessionBurnoutHelp")}
+                      />
+                    ) : null}
+                    {insight.kind === "drift" ? (
+                      <FieldHelp text={t("prediction.auction.driftHelp")} />
+                    ) : null}
                   </p>
                   <p className="mt-1 text-sm text-slate-600">{description}</p>
                 </div>
