@@ -1,6 +1,8 @@
 import type { CpmMetadata } from "@/features/system/types";
-
-const CPM_EQUALITY_EPSILON = 0.05;
+import {
+  areCpmThresholdsAvailable,
+  cpmApproxEqualsMax,
+} from "./auctionIntelligence";
 
 export type CpmAlertKind =
   | "guaranteed_win"
@@ -13,22 +15,22 @@ export function resolveCpmAlertKind(
   cpm: number,
   cpmMeta: CpmMetadata | undefined,
 ): CpmAlertKind {
-  const median = cpmMeta?.median_competitor_cpm ?? null;
-  const max = cpmMeta?.max_competitor_cpm ?? null;
-
-  if (median == null || max == null) {
+  if (!areCpmThresholdsAvailable(cpmMeta)) {
     return "thresholds_unavailable";
   }
 
-  if (max != null && cpm > max) {
+  const median = cpmMeta!.median_competitor_cpm!;
+  const max = cpmMeta!.max_competitor_cpm!;
+
+  if (cpm > max) {
     return "guaranteed_win";
   }
 
-  if (max != null && Math.abs(cpm - max) <= CPM_EQUALITY_EPSILON) {
+  if (cpmApproxEqualsMax(cpm, max)) {
     return "edge_case";
   }
 
-  if (median != null && cpm < median) {
+  if (cpm < median) {
     return "low_competitiveness";
   }
 

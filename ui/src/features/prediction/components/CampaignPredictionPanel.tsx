@@ -7,9 +7,12 @@ import {
   isModelUnavailableError,
   isValidationError,
 } from "../api";
-import { usePredictCampaign } from "../hooks";
+import { usePredictCampaign, usePredictCpmSweep } from "../hooks";
+import type { CampaignFormInput } from "../schema";
 import type { CampaignRequest } from "../types";
+import { AuctionIntelligencePanel } from "./AuctionIntelligencePanel";
 import { CampaignForm } from "./CampaignForm";
+import { CpmSweepPanel } from "./CpmSweepPanel";
 import { PredictionAlerts } from "./PredictionAlerts";
 import { PredictionResultCards } from "./PredictionResultCards";
 import { PredictionSummaryCard } from "./PredictionSummaryCard";
@@ -24,9 +27,13 @@ export function CampaignPredictionPanel() {
   const health = useHealth();
   const metadata = useMetadata();
   const predict = usePredictCampaign();
+  const sweep = usePredictCpmSweep();
 
   const [lastRequest, setLastRequest] = useState<CampaignRequest | null>(null);
   const [formCpm, setFormCpm] = useState(0);
+  const [campaignFormValues, setCampaignFormValues] =
+    useState<CampaignFormInput | null>(null);
+  const [campaignFormValid, setCampaignFormValid] = useState(false);
 
   const modelReady =
     health.data?.model_ready ?? metadata.data?.model_ready ?? undefined;
@@ -46,10 +53,12 @@ export function CampaignPredictionPanel() {
 
   const handleReset = () => {
     predict.reset();
+    sweep.reset();
     setLastRequest(null);
   };
 
   const displayAudienceSize = lastRequest?.audience_size ?? 0;
+  const selectedCpm = lastRequest?.cpm ?? formCpm;
 
   return (
     <section className="space-y-6" aria-labelledby="prediction-panel-title">
@@ -80,71 +89,96 @@ export function CampaignPredictionPanel() {
         </div>
       ) : null}
 
-      <PredictionAlerts
-        cpm={lastRequest?.cpm ?? formCpm}
-        metadata={metadata.data}
-        metadataError={metadata.isError}
-        response={predict.data}
-        modelReady={modelReady}
-        publisherUniverseEmpty={publisherEmpty}
-      />
-
-      <Card
-        title={t("prediction.form.cardTitle")}
-        description={t("prediction.form.cardDescription")}
-      >
-        {metadata.isLoading && !metadata.data ? (
-          <LoadingState />
-        ) : (
-          <CampaignForm
-            metadata={metadata.data}
-            isSubmitting={predict.isPending}
-            onSubmit={handleSubmit}
-            onResetResults={handleReset}
-            onCpmChange={setFormCpm}
-          />
-        )}
-      </Card>
-
-      {predict.isPending ? <LoadingState label={t("prediction.form.submitting")} /> : null}
-
-      {predict.isError ? (
-        isModelUnavailableError(predict.error) ? (
-          <PredictionUnavailableState
-            detail={getPredictionErrorDetail(predict.error)}
-            onRetry={() => {
-              if (lastRequest) {
-                predict.mutate(lastRequest);
-              }
-            }}
-          />
-        ) : (
-          <ErrorState
-            title={
-              isValidationError(predict.error)
-                ? t("prediction.errors.validationTitle")
-                : t("prediction.errors.genericTitle")
-            }
-            description={getPredictionErrorDetail(predict.error)}
-            onRetry={() => {
-              if (lastRequest) {
-                predict.mutate(lastRequest);
-              }
-            }}
-          />
-        )
-      ) : null}
-
-      {predict.data && displayAudienceSize > 0 ? (
+      <div className="grid gap-6 xl:grid-cols-[minmax(300px,380px)_1fr]">
         <div className="space-y-6">
-          <PredictionSummaryCard
-            response={predict.data}
-            audienceSize={displayAudienceSize}
-          />
-          <PredictionResultCards response={predict.data} />
-          <ProbabilityBreakdown />
+          <Card
+            title={t("prediction.form.cardTitle")}
+            description={t("prediction.form.cardDescription")}
+          >
+            {metadata.isLoading && !metadata.data ? (
+              <LoadingState />
+            ) : (
+              <CampaignForm
+                metadata={metadata.data}
+                isSubmitting={predict.isPending}
+                onSubmit={handleSubmit}
+                onResetResults={handleReset}
+                onCpmChange={setFormCpm}
+                onFormValuesChange={(values, valid) => {
+                  setCampaignFormValues(values);
+                  setCampaignFormValid(valid);
+                }}
+              />
+            )}
+          </Card>
         </div>
-      ) : null}
+
+        <div className="space-y-6">
+          <PredictionAlerts
+            cpm={selectedCpm}
+            metadata={metadata.data}
+            metadataError={metadata.isError}
+            response={predict.data}
+            modelReady={modelReady}
+            publisherUniverseEmpty={publisherEmpty}
+          />
+
+          {predict.isPending ? (
+            <LoadingState label={t("prediction.form.submitting")} />
+          ) : null}
+
+          {predict.isError ? (
+            isModelUnavailableError(predict.error) ? (
+              <PredictionUnavailableState
+                detail={getPredictionErrorDetail(predict.error)}
+                onRetry={() => {
+                  if (lastRequest) {
+                    predict.mutate(lastRequest);
+                  }
+                }}
+              />
+            ) : (
+              <ErrorState
+                title={
+                  isValidationError(predict.error)
+                    ? t("prediction.errors.validationTitle")
+                    : t("prediction.errors.genericTitle")
+                }
+                description={getPredictionErrorDetail(predict.error)}
+                onRetry={() => {
+                  if (lastRequest) {
+                    predict.mutate(lastRequest);
+                  }
+                }}
+              />
+            )
+          ) : null}
+
+          {predict.data && displayAudienceSize > 0 ? (
+            <div className="space-y-6">
+              <PredictionSummaryCard
+                response={predict.data}
+                audienceSize={displayAudienceSize}
+              />
+              <PredictionResultCards response={predict.data} />
+              <ProbabilityBreakdown />
+            </div>
+          ) : null}
+
+          <CpmSweepPanel
+            metadata={metadata.data}
+            campaignFormValues={campaignFormValues}
+            campaignFormValid={campaignFormValid}
+            sweep={sweep}
+          />
+
+          <AuctionIntelligencePanel
+            cpm={selectedCpm}
+            metadata={metadata.data}
+            sweepPoints={sweep.data?.points}
+          />
+        </div>
+      </div>
     </section>
   );
 }

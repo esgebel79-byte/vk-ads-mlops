@@ -22,6 +22,10 @@ type CampaignFormProps = {
   onSubmit: (request: ReturnType<typeof formValuesToCampaignRequest>) => void;
   onResetResults: () => void;
   onCpmChange?: (cpm: number) => void;
+  onFormValuesChange?: (
+    values: CampaignFormInput,
+    isValid: boolean,
+  ) => void;
 };
 
 const buttonPrimary =
@@ -35,6 +39,7 @@ export function CampaignForm({
   onSubmit,
   onResetResults,
   onCpmChange,
+  onFormValuesChange,
 }: CampaignFormProps) {
   const { t } = useTranslation();
 
@@ -77,12 +82,17 @@ export function CampaignForm({
   });
 
   const cpmValue = watch("cpm");
+  const watchedValues = watch();
 
   useEffect(() => {
     if (typeof cpmValue === "number" && !Number.isNaN(cpmValue)) {
       onCpmChange?.(cpmValue);
     }
   }, [cpmValue, onCpmChange]);
+
+  useEffect(() => {
+    onFormValuesChange?.(watchedValues as CampaignFormInput, isValid);
+  }, [watchedValues, isValid, onFormValuesChange]);
 
   const submit = handleSubmit((values) => {
     onSubmit(formValuesToCampaignRequest(values));

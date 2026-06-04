@@ -110,6 +110,88 @@
     "errors": {
       "validationTitle": "Invalid campaign inputs",
       "genericTitle": "Prediction failed"
+    },
+    "sweep": {
+      "panelTitle": "CPM sensitivity sweep",
+      "panelDescription": "Explore how predicted reach and impression probabilities change across a CPM range using your current campaign settings.",
+      "campaignInvalidHint": "Complete valid campaign inputs on the left before running a sweep.",
+      "controls": {
+        "ariaLabel": "CPM sweep range configuration",
+        "minLabel": "Minimum CPM",
+        "maxLabel": "Maximum CPM",
+        "stepLabel": "CPM step",
+        "stepHelper": "Each sweep point increases CPM by this step. Maximum {{maxPoints}} points per request.",
+        "run": "Run CPM sweep",
+        "running": "Running sweep…",
+        "reset": "Reset sweep"
+      },
+      "validation": {
+        "required": "This field is required.",
+        "sweep_min_negative": "Minimum CPM cannot be negative.",
+        "sweep_max_below_min": "Maximum CPM must be greater than or equal to minimum CPM.",
+        "sweep_step_invalid": "CPM step must be greater than zero.",
+        "sweep_too_many_points": "This range produces too many points. Reduce the range or increase the step (maximum {{maxPoints}} points)."
+      },
+      "chart": {
+        "title": "Sweep results",
+        "loading": "Running CPM sweep…",
+        "emptyTitle": "No sweep data yet",
+        "emptyDescription": "Configure a CPM range and run a sweep to visualize predicted reach and probabilities.",
+        "modeToggleLabel": "Chart display mode",
+        "modeReach": "Predicted reach",
+        "modeProbabilities": "Impression probabilities",
+        "axisCpm": "CPM",
+        "axisReach": "Predicted unique reach",
+        "axisProbability": "Probability",
+        "tooltipCpm": "CPM",
+        "tooltipReach": "Predicted reach",
+        "tooltipAtLeastOne": "At least 1 impression",
+        "tooltipAtLeastTwo": "At least 2 impressions",
+        "tooltipAtLeastThree": "At least 3 impressions"
+      },
+      "thresholds": {
+        "unavailableNotice": "Competitor CPM thresholds are not available from backend metadata.",
+        "medianLabel": "Median competitor CPM",
+        "medianShort": "Median",
+        "medianDescription": "Typical winning bid level among competitors in training data.",
+        "maxLabel": "Max competitor CPM",
+        "maxShort": "Max",
+        "maxDescription": "Upper competitor bid level; bids above this often win auctions more consistently."
+      },
+      "summary": {
+        "bestCpm": "Best CPM (by reach)",
+        "highestReach": "Highest predicted reach",
+        "pointCount": "Sweep points",
+        "modelVersion": "Model version",
+        "latency": "Latency (seconds)",
+        "driftPoints": "Drift-flagged points"
+      },
+      "unavailable": {
+        "title": "CPM sweep unavailable",
+        "description": "CPM sweep is unavailable because the prediction model artifacts are missing or not loaded."
+      },
+      "errors": {
+        "validationTitle": "Invalid sweep configuration",
+        "genericTitle": "CPM sweep failed",
+        "genericDescription": "The sweep request could not be completed."
+      }
+    },
+    "auction": {
+      "panelTitle": "Auction intelligence",
+      "panelDescription": "Actionable insights from your selected CPM, competitor thresholds, and sweep results.",
+      "noInsights": "No auction alerts for the current configuration. Adjust CPM or run a sweep for more context.",
+      "guaranteedWinTitle": "Likely guaranteed auction win",
+      "guaranteedWinDescription": "Your CPM is above the maximum competitor CPM from metadata, which often indicates a likely guaranteed auction win.",
+      "edgeCaseTitle": "CPM at competitor ceiling",
+      "edgeCaseDescription": "Your CPM is approximately equal to the maximum competitor CPM. Auction outcomes may be uncertain (~50% win scenarios).",
+      "lowCompetitivenessTitle": "Low auction competitiveness",
+      "lowCompetitivenessDescription": "Your CPM is below the median competitor CPM. Reach may be limited unless you increase bid competitiveness.",
+      "thresholdsLimitedTitle": "Auction intelligence limited",
+      "thresholdsLimitedDescription": "Competitor CPM statistics are not available from backend metadata. Win-rate guidance is unavailable until thresholds are provided.",
+      "driftTitle": "Model distribution warning",
+      "driftDescription": "One or more sweep points are flagged for distribution drift. Interpret reach curves with extra care.",
+      "sessionBurnoutTitle": "Session burnout",
+      "sessionBurnoutDescription": "Ads already seen by a user in the same session may not be shown again until the {{hours}}-hour silence window expires. This can reduce final reach for long campaigns."
     }
   },
   "system": {

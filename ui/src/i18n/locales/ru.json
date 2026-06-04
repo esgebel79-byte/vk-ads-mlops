@@ -110,6 +110,88 @@
     "errors": {
       "validationTitle": "Некорректные параметры кампании",
       "genericTitle": "Ошибка прогноза"
+    },
+    "sweep": {
+      "panelTitle": "CPM sweep — чувствительность",
+      "panelDescription": "Изучите, как меняются прогноз охвата и вероятности показов в диапазоне CPM с текущими параметрами кампании.",
+      "campaignInvalidHint": "Заполните корректные параметры кампании слева перед запуском sweep.",
+      "controls": {
+        "ariaLabel": "Настройка диапазона CPM sweep",
+        "minLabel": "Минимальный CPM",
+        "maxLabel": "Максимальный CPM",
+        "stepLabel": "Шаг CPM",
+        "stepHelper": "Каждая точка sweep увеличивает CPM на этот шаг. Максимум {{maxPoints}} точек за запрос.",
+        "run": "Запустить CPM sweep",
+        "running": "Выполняется sweep…",
+        "reset": "Сбросить sweep"
+      },
+      "validation": {
+        "required": "Поле обязательно.",
+        "sweep_min_negative": "Минимальный CPM не может быть отрицательным.",
+        "sweep_max_below_min": "Максимальный CPM должен быть не меньше минимального.",
+        "sweep_step_invalid": "Шаг CPM должен быть больше нуля.",
+        "sweep_too_many_points": "Слишком много точек в диапазоне. Уменьшите диапазон или увеличьте шаг (максимум {{maxPoints}} точек)."
+      },
+      "chart": {
+        "title": "Результаты sweep",
+        "loading": "Выполняется CPM sweep…",
+        "emptyTitle": "Данных sweep пока нет",
+        "emptyDescription": "Настройте диапазон CPM и запустите sweep для визуализации охвата и вероятностей.",
+        "modeToggleLabel": "Режим отображения графика",
+        "modeReach": "Прогноз охвата",
+        "modeProbabilities": "Вероятности показов",
+        "axisCpm": "CPM",
+        "axisReach": "Прогноз уникального охвата",
+        "axisProbability": "Вероятность",
+        "tooltipCpm": "CPM",
+        "tooltipReach": "Прогноз охвата",
+        "tooltipAtLeastOne": "Хотя бы 1 показ",
+        "tooltipAtLeastTwo": "Хотя бы 2 показа",
+        "tooltipAtLeastThree": "Хотя бы 3 показа"
+      },
+      "thresholds": {
+        "unavailableNotice": "Пороги CPM конкурентов недоступны в метаданных бэкенда.",
+        "medianLabel": "Медианный CPM конкурентов",
+        "medianShort": "Медиана",
+        "medianDescription": "Типичный уровень ставки конкурентов в обучающих данных.",
+        "maxLabel": "Макс. CPM конкурентов",
+        "maxShort": "Макс.",
+        "maxDescription": "Верхний уровень ставок конкурентов; ставки выше часто стабильнее выигрывают аукционы."
+      },
+      "summary": {
+        "bestCpm": "Лучший CPM (по охвату)",
+        "highestReach": "Максимальный прогноз охвата",
+        "pointCount": "Точек sweep",
+        "modelVersion": "Версия модели",
+        "latency": "Задержка (сек)",
+        "driftPoints": "Точек с флагом дрейфа"
+      },
+      "unavailable": {
+        "title": "CPM sweep недоступен",
+        "description": "CPM sweep недоступен: артефакты модели прогноза отсутствуют или не загружены."
+      },
+      "errors": {
+        "validationTitle": "Некорректная конфигурация sweep",
+        "genericTitle": "Ошибка CPM sweep",
+        "genericDescription": "Не удалось выполнить запрос sweep."
+      }
+    },
+    "auction": {
+      "panelTitle": "Аукционная аналитика",
+      "panelDescription": "Практические выводы по выбранному CPM, порогам конкурентов и результатам sweep.",
+      "noInsights": "Нет аукционных предупреждений для текущей конфигурации. Измените CPM или запустите sweep для дополнительного контекста.",
+      "guaranteedWinTitle": "Вероятная гарантированная победа в аукционе",
+      "guaranteedWinDescription": "Ваш CPM выше максимального CPM конкурентов из метаданных — часто это указывает на вероятную гарантированную победу.",
+      "edgeCaseTitle": "CPM на уровне потолка конкурентов",
+      "edgeCaseDescription": "Ваш CPM примерно равен максимальному CPM конкурентов. Исход аукциона может быть неопределённым (~50% побед).",
+      "lowCompetitivenessTitle": "Низкая конкурентоспособность в аукционе",
+      "lowCompetitivenessDescription": "Ваш CPM ниже медианного CPM конкурентов. Охват может быть ограничен без повышения ставки.",
+      "thresholdsLimitedTitle": "Аукционная аналитика ограничена",
+      "thresholdsLimitedDescription": "Статистика CPM конкурентов недоступна в метаданных бэкенда. Рекомендации по win-rate недоступны, пока пороги не будут предоставлены.",
+      "driftTitle": "Предупреждение о дрейфе распределения",
+      "driftDescription": "Одна или несколько точек sweep помечены дрейфом распределения. Интерпретируйте кривую охвата с осторожностью.",
+      "sessionBurnoutTitle": "Выгорание сессии",
+      "sessionBurnoutDescription": "Реклама, уже показанная пользователю в той же сессии, может не показываться снова, пока не истечёт окно тишины {{hours}} ч. Это может снизить итоговый охват длинных кампаний."
     }
   },
   "system": {

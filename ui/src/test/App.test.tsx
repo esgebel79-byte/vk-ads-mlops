@@ -13,6 +13,7 @@ import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 
 vi.mock("@/features/prediction/api", () => ({
   predictCampaign: vi.fn(),
+  predictCpmSweep: vi.fn(),
   HttpError: class HttpError extends Error {
     status: number;
     body: unknown;
