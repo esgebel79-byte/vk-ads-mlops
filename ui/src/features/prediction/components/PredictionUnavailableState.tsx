@@ -1,27 +1,14 @@
 import { useTranslation } from "react-i18next";
-import { ErrorState } from "@/shared/components/ErrorState";
+import { EmptyState } from "@/shared/components/EmptyState";
 
-type PredictionUnavailableStateProps = {
-  detail?: string;
-  onRetry?: () => void;
-};
-
-export function PredictionUnavailableState({
-  detail,
-  onRetry,
-}: PredictionUnavailableStateProps) {
+export function PredictionUnavailableState() {
   const { t } = useTranslation();
 
   return (
-    <ErrorState
+    <EmptyState
       title={t("prediction.unavailable.title")}
-      description={
-        detail
-          ? `${t("prediction.unavailable.description")} ${detail}`
-          : t("prediction.unavailable.description")
-      }
-      onRetry={onRetry}
-      className="border-amber-200 bg-amber-50/80 text-left"
+      description={t("prediction.unavailable.description")}
+      className="border-amber-200/80 bg-amber-50/50"
     />
   );
 }

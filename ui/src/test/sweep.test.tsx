@@ -153,7 +153,9 @@ describe("AuctionIntelligencePanel", () => {
     renderWithProviders(
       <AuctionIntelligencePanel cpm={15} metadata={metadataFixture} />,
     );
-    expect(screen.getByText("Session burnout")).toBeInTheDocument();
+    expect(
+      screen.getByText("Session frequency limitation"),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/4-hour inactivity window expires/),
     ).toBeInTheDocument();

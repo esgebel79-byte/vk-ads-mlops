@@ -12,8 +12,6 @@ type PredictionAlertsProps = {
   metadata?: MetadataResponse;
   metadataError?: boolean;
   response?: PredictionResponse;
-  modelReady?: boolean;
-  publisherUniverseEmpty?: boolean;
 };
 
 type AlertItem = {
@@ -61,20 +59,9 @@ export function PredictionAlerts({
   metadata,
   metadataError,
   response,
-  modelReady,
-  publisherUniverseEmpty,
 }: PredictionAlertsProps) {
   const { t } = useTranslation();
   const alerts: AlertItem[] = [];
-
-  if (modelReady === false) {
-    alerts.push({
-      id: "model-not-ready",
-      variant: "warning",
-      title: t("prediction.alerts.modelNotReadyTitle"),
-      description: t("prediction.alerts.modelNotReadyDescription"),
-    });
-  }
 
   if (metadataError) {
     alerts.push({
@@ -82,15 +69,6 @@ export function PredictionAlerts({
       variant: "warning",
       title: t("prediction.alerts.metadataUnavailableTitle"),
       description: t("prediction.alerts.metadataUnavailableDescription"),
-    });
-  }
-
-  if (publisherUniverseEmpty) {
-    alerts.push({
-      id: "publisher-empty",
-      variant: "info",
-      title: t("prediction.alerts.publisherEmptyTitle"),
-      description: t("prediction.alerts.publisherEmptyDescription"),
     });
   }
 

@@ -1,4 +1,3 @@
-import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHealth, useMetadata } from "@/features/system/hooks";
@@ -22,6 +21,7 @@ import { ProbabilityBreakdown } from "./ProbabilityBreakdown";
 import { Card } from "@/shared/components/Card";
 import { ErrorState } from "@/shared/components/ErrorState";
 import { LoadingState } from "@/shared/components/LoadingState";
+import { sanitizeMarketerErrorDetail } from "@/shared/lib/sanitizeErrorDetail";
 
 export function CampaignPredictionPanel() {
   const { t } = useTranslation();
@@ -38,14 +38,7 @@ export function CampaignPredictionPanel() {
 
   const modelReady =
     health.data?.model_ready ?? metadata.data?.model_ready ?? undefined;
-  const modelLoaded =
-    health.data?.model_loaded ?? metadata.data?.model_loaded ?? undefined;
-  const showFormWarning =
-    modelReady === false || modelLoaded === false;
-
-  const publisherEmpty =
-    metadata.data !== undefined &&
-    metadata.data.publisher_universe.length === 0;
+  const modelNotReady = modelReady === false;
 
   const handleSubmit = (request: CampaignRequest) => {
     setLastRequest(request);
@@ -75,21 +68,6 @@ export function CampaignPredictionPanel() {
         </p>
       </div>
 
-      {showFormWarning ? (
-        <div
-          className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-4"
-          role="alert"
-        >
-          <AlertTriangle
-            className="mt-0.5 h-5 w-5 shrink-0 text-amber-600"
-            aria-hidden
-          />
-          <p className="text-sm text-amber-950">
-            {t("prediction.alerts.formModelNotReady")}
-          </p>
-        </div>
-      ) : null}
-
       <div className="grid gap-6 xl:grid-cols-[minmax(300px,380px)_1fr]">
         <div className="space-y-6">
           <Card
@@ -102,6 +80,7 @@ export function CampaignPredictionPanel() {
               <CampaignForm
                 metadata={metadata.data}
                 isSubmitting={predict.isPending}
+                modelNotReady={modelNotReady}
                 onSubmit={handleSubmit}
                 onResetResults={handleReset}
                 onCpmChange={setFormCpm}
@@ -120,8 +99,6 @@ export function CampaignPredictionPanel() {
             metadata={metadata.data}
             metadataError={metadata.isError}
             response={predict.data}
-            modelReady={modelReady}
-            publisherUniverseEmpty={publisherEmpty}
           />
 
           <WinProbabilityIndicator
@@ -135,14 +112,7 @@ export function CampaignPredictionPanel() {
 
           {predict.isError ? (
             isModelUnavailableError(predict.error) ? (
-              <PredictionUnavailableState
-                detail={getPredictionErrorDetail(predict.error)}
-                onRetry={() => {
-                  if (lastRequest) {
-                    predict.mutate(lastRequest);
-                  }
-                }}
-              />
+              <PredictionUnavailableState />
             ) : (
               <ErrorState
                 title={
@@ -150,7 +120,11 @@ export function CampaignPredictionPanel() {
                     ? t("prediction.errors.validationTitle")
                     : t("prediction.errors.genericTitle")
                 }
-                description={getPredictionErrorDetail(predict.error)}
+                description={
+                  sanitizeMarketerErrorDetail(
+                    getPredictionErrorDetail(predict.error),
+                  ) ?? t("states.errorDescription")
+                }
                 onRetry={() => {
                   if (lastRequest) {
                     predict.mutate(lastRequest);
@@ -173,6 +147,7 @@ export function CampaignPredictionPanel() {
 
           <CpmSweepPanel
             metadata={metadata.data}
+            modelNotReady={modelNotReady}
             campaignFormValues={campaignFormValues}
             campaignFormValid={campaignFormValid}
             sweep={sweep}

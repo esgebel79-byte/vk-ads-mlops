@@ -1,6 +1,6 @@
 # VK Ads Reach Intelligence — Frontend
 
-Phase 5.5 applies supervisor UI requirements compliance before Docker integration. Phase 5 adds prediction history, CSV export, and enhanced system analytics on top of Phase 4 CPM sweep and auction intelligence.
+Phase 5.6 refines dashboard copy and layout for marketers. Phase 5.5 applies supervisor UI requirements compliance before Docker integration. Phase 5 adds prediction history, CSV export, and enhanced system analytics on top of Phase 4 CPM sweep and auction intelligence.
 
 Integrated API endpoints:
 
@@ -69,6 +69,13 @@ From the repository root, start the inference API (see main project docs), then 
 | `npm run preview` | Preview production build |
 | `npm run test` | Run Vitest once |
 | `npm run lint` | ESLint |
+
+## Dashboard UX cleanup (Phase 5.6)
+
+- **Dashboard (`/`)** — marketer-facing: hero, single model-readiness banner, campaign setup, results, winning probability, CPM sweep, and auction intelligence. A compact **Service snapshot** strip shows high-level status only (no artifact paths or full metadata tables).
+- **System status (`/system`)** — operator/developer-facing: health, analytics, recent activity, and a collapsible **Technical details** section with artifact paths and full service metadata.
+- **Unavailable states** — missing model artifacts show calm warning/neutral copy (not raw `/app/...` paths or `.npy` filenames on the dashboard).
+- **i18n** — all visible dashboard and system strings live in `src/i18n/locales/en.json` and `ru.json`.
 
 ## Phase 5 features
 
@@ -153,7 +160,7 @@ All visible UI strings live in `src/i18n/locales/en.json` and `ru.json`. Use the
 
 ## Pages
 
-- `/` — Dashboard: model readiness, campaign prediction, CPM sweep, auction intelligence
+- `/` — Dashboard (marketer-facing): campaign prediction, CPM sweep, auction intelligence, service snapshot
 - `/history` — Prediction history with filters, export, and details drawer
 - `/system` — System status with analytics overview, recent activity, artifacts, metadata
 
@@ -163,7 +170,7 @@ All visible UI strings live in `src/i18n/locales/en.json` and `ru.json`. Use the
 npm run test
 ```
 
-Unit tests mock API modules; no live backend is required. Coverage includes requirements compliance (segment labels/validation, CPM step, win probability indicator, session burnout), history normalization, summary metrics, filtering, sorting, CSV export, history page empty state, details drawer, system recent activity panel, and language switcher.
+Unit tests mock API modules; no live backend is required. Coverage includes dashboard UX cleanup (no artifact paths on dashboard, single readiness banner, disabled actions when model not ready), requirements compliance (segment labels/validation, CPM step, win probability indicator, session limitation), history normalization, summary metrics, filtering, sorting, CSV export, history page empty state, details drawer, system technical details accordion, and language switcher.
 
 ## Limitations
 

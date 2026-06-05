@@ -3,10 +3,12 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { recentPredictionsQueryKey } from "@/features/history/hooks";
 import { ArtifactReadinessPanel } from "@/features/system/components/ArtifactReadinessPanel";
+import { HealthStatusCard } from "@/features/system/components/HealthStatusCard";
 import { ModelMetadataPanel } from "@/features/system/components/ModelMetadataPanel";
 import { ModelReadinessBanner } from "@/features/system/components/ModelReadinessBanner";
 import { RecentActivityPanel } from "@/features/system/components/RecentActivityPanel";
 import { SystemAnalyticsPanel } from "@/features/system/components/SystemAnalyticsPanel";
+import { TechnicalDetailsSection } from "@/features/system/components/TechnicalDetailsSection";
 import { useHealth, useMetadata } from "@/features/system/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDateTime } from "@/shared/lib/formatters";
@@ -46,6 +48,9 @@ export function SystemStatusPage() {
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
             {t("system.description")}
           </p>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+            {t("system.operatorHint")}
+          </p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <button
@@ -74,10 +79,15 @@ export function SystemStatusPage() {
         metadata={metadata.data}
       />
 
+      <HealthStatusCard includeArtifacts={false} />
+
       <SystemAnalyticsPanel />
       <RecentActivityPanel />
-      <ArtifactReadinessPanel />
-      <ModelMetadataPanel />
+
+      <TechnicalDetailsSection>
+        <ArtifactReadinessPanel />
+        <ModelMetadataPanel />
+      </TechnicalDetailsSection>
     </div>
   );
 }

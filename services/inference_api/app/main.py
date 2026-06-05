@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import math
 import os
 import subprocess
 import sys
@@ -35,6 +37,13 @@ DEFAULT_STAGE10_DIR = PROJECT_ROOT / "data" / "processed" / "stage10"
 DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "deepsets" / "deepsets_attn.pt"
 DEFAULT_REPORT_PATH = PROJECT_ROOT / "models" / "deepsets" / "report_stage13.json"
 TARGET_NAMES = ["at_least_one", "at_least_two", "at_least_three"]
+DEFAULT_INFERENCE_USER_SAMPLE_SIZE = 1000
+
+logger = logging.getLogger(__name__)
+
+
+class InferenceOutputError(Exception):
+    """Raised when model inference returns non-finite prediction values."""
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -134,6 +143,7 @@ class Settings(BaseModel):
     time_min_hour: int = 0
     time_max_hour: int = 168
     session_silence_window_hours: float = 4.0
+    default_inference_user_sample_size: int = DEFAULT_INFERENCE_USER_SAMPLE_SIZE
 
 
 class CampaignWindowRequest(BaseModel):
@@ -196,6 +206,7 @@ class SweepResponse(BaseModel):
     points: list[SweepPoint]
     model_version: str
     latency_seconds: float
+    warnings: list[str] = Field(default_factory=list)
 
 
 class CpmMetadata(BaseModel):
@@ -283,6 +294,9 @@ settings = Settings(
     time_min_hour=int(os.getenv("TIME_MIN_HOUR", "0")),
     time_max_hour=int(os.getenv("TIME_MAX_HOUR", "168")),
     session_silence_window_hours=float(os.getenv("SESSION_SILENCE_WINDOW_HOURS", "4")),
+    default_inference_user_sample_size=int(
+        os.getenv("DEFAULT_INFERENCE_USER_SAMPLE_SIZE", str(DEFAULT_INFERENCE_USER_SAMPLE_SIZE))
+    ),
 )
 app.add_middleware(
     CORSMiddleware,
@@ -377,9 +391,19 @@ class ModelBundle:
         if "mean_RMSE" in overall:
             model_rmse.set(float(overall["mean_RMSE"]))
 
-    def predict(self, request: CampaignRequest) -> tuple[dict[str, float], bool, dict[str, Any] | None]:
+    def predict(
+        self,
+        request: CampaignRequest,
+        selected_user_ids: list[int] | None = None,
+    ) -> tuple[dict[str, float], bool, dict[str, Any] | None]:
         publishers = [int(x) for x in request.publishers]
-        user_ids = [int(x) for x in request.user_ids]
+        if selected_user_ids is None:
+            selected_user_ids, _ = select_inference_user_ids(
+                request,
+                self.user_id_sorted,
+                self.cfg.default_inference_user_sample_size,
+            )
+        user_ids = [int(x) for x in selected_user_ids]
         publishers_str = ",".join(str(x) for x in publishers)
         user_ids_str = ",".join(str(x) for x in user_ids)
         drift_flag = any(int(p) not in self.pub_universe_set for p in publishers)
@@ -430,6 +454,126 @@ def root() -> dict[str, str]:
         "docs": "/docs",
         "metrics": "/metrics",
     }
+
+
+def is_finite_number(value: Any) -> bool:
+    if value is None:
+        return False
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(numeric)
+
+
+def sanitize_probability(value: Any, name: str) -> float:
+    if not is_finite_number(value):
+        raise InferenceOutputError(f"Model returned non-finite value for {name}.")
+    clamped = max(0.0, min(1.0, float(value)))
+    return clamped
+
+
+def sanitize_prediction_values(values: dict[str, float]) -> dict[str, float]:
+    return {name: sanitize_probability(values[name], name) for name in TARGET_NAMES}
+
+
+def calculate_predicted_reach(audience_size: int, probability: float) -> int:
+    safe_probability = sanitize_probability(probability, "at_least_one")
+    return int(round(audience_size * safe_probability))
+
+
+def filter_known_user_ids(user_ids: list[int], user_id_sorted: NumpyArray) -> list[int]:
+    if not user_ids:
+        return []
+    if np is None:
+        import numpy as _np
+
+        arr = _np.asarray(user_ids, dtype=_np.int64)
+        pos = _np.searchsorted(user_id_sorted, arr)
+        in_bounds = (pos >= 0) & (pos < len(user_id_sorted))
+        ok = _np.zeros(len(arr), dtype=bool)
+        if in_bounds.any():
+            ok[in_bounds] = user_id_sorted[pos[in_bounds]] == arr[in_bounds]
+        return [int(x) for x in arr[ok]]
+
+    arr = np.asarray(user_ids, dtype=np.int64)
+    pos = np.searchsorted(user_id_sorted, arr)
+    in_bounds = (pos >= 0) & (pos < len(user_id_sorted))
+    ok = np.zeros(len(arr), dtype=bool)
+    if in_bounds.any():
+        ok[in_bounds] = user_id_sorted[pos[in_bounds]] == arr[in_bounds]
+    return [int(x) for x in arr[ok]]
+
+
+def select_inference_user_ids(
+    request: CampaignWindowRequest,
+    user_id_sorted: NumpyArray,
+    default_sample_size: int,
+) -> tuple[list[int], Literal["provided", "default_sample"]]:
+    available_count = int(len(user_id_sorted))
+    if available_count == 0:
+        raise HTTPException(
+            status_code=503,
+            detail="No users available in the inference dataset.",
+        )
+
+    if request.user_ids:
+        known = filter_known_user_ids([int(x) for x in request.user_ids], user_id_sorted)
+        if not known:
+            raise HTTPException(
+                status_code=422,
+                detail="None of the provided user IDs are available in the inference dataset.",
+            )
+        return known, "provided"
+
+    selected_count = min(
+        int(request.audience_size),
+        available_count,
+        int(default_sample_size),
+    )
+    if selected_count <= 0:
+        raise HTTPException(
+            status_code=503,
+            detail="No users available in the inference dataset.",
+        )
+    selected = [int(x) for x in user_id_sorted[:selected_count]]
+    return selected, "default_sample"
+
+
+def log_default_user_sample(
+    endpoint: str,
+    selected_user_count: int,
+    audience_size: int,
+) -> None:
+    logger.info(
+        "Empty user_ids replaced with default inference sample: "
+        "endpoint=%s selected_user_count=%d audience_size=%d",
+        endpoint,
+        selected_user_count,
+        audience_size,
+    )
+
+
+def log_non_finite_output(
+    endpoint: str,
+    request: CampaignWindowRequest,
+    *,
+    cpm: float | None = None,
+    selected_user_count: int,
+) -> None:
+    logger.error(
+        "Non-finite model output detected: endpoint=%s cpm=%s hour_start=%d hour_end=%d "
+        "publishers=%s audience_size=%d user_ids_count=%d selected_user_count=%d model_version=%s",
+        endpoint,
+        cpm if cpm is not None else "n/a",
+        request.hour_start,
+        request.hour_end,
+        request.publishers,
+        request.audience_size,
+        len(request.user_ids),
+        selected_user_count,
+        settings.model_version,
+    )
 
 
 def stable_seed(value: str, seed: int) -> int:
@@ -658,14 +802,33 @@ def predict(request: CampaignRequest) -> PredictionResponse:
     prediction_id = str(uuid4())
     try:
         bundle = get_model_bundle()
-        values, drift_flag, drift_report = bundle.predict(request)
+        selected_user_ids, source = select_inference_user_ids(
+            request,
+            bundle.user_id_sorted,
+            settings.default_inference_user_sample_size,
+        )
+        if source == "default_sample":
+            log_default_user_sample("/predict", len(selected_user_ids), request.audience_size)
+
+        values, drift_flag, drift_report = bundle.predict(request, selected_user_ids)
+        try:
+            sanitized = sanitize_prediction_values(values)
+        except InferenceOutputError as exc:
+            log_non_finite_output(
+                "/predict",
+                request,
+                cpm=request.cpm,
+                selected_user_count=len(selected_user_ids),
+            )
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
         if drift_flag:
             drift_alert_count.inc()
         prediction_count.inc()
         response = PredictionResponse(
-            at_least_one=values["at_least_one"],
-            at_least_two=values["at_least_two"],
-            at_least_three=values["at_least_three"],
+            at_least_one=sanitized["at_least_one"],
+            at_least_two=sanitized["at_least_two"],
+            at_least_three=sanitized["at_least_three"],
             model_version=settings.model_version,
             drift_flag=drift_flag,
             prediction_id=prediction_id,
@@ -681,6 +844,9 @@ def predict(request: CampaignRequest) -> PredictionResponse:
             }
         )
         return response
+    except HTTPException:
+        prediction_error_count.inc()
+        raise
     except FileNotFoundError as exc:
         prediction_error_count.inc()
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -701,7 +867,21 @@ def predict_sweep(request: SweepRequest) -> SweepResponse:
     try:
         validate_sweep_point_count(request.cpm_range)
         bundle = get_model_bundle()
+        selected_user_ids, source = select_inference_user_ids(
+            request.base_request,
+            bundle.user_id_sorted,
+            settings.default_inference_user_sample_size,
+        )
+        if source == "default_sample":
+            log_default_user_sample(
+                "/predict/sweep",
+                len(selected_user_ids),
+                request.base_request.audience_size,
+            )
+
         points: list[SweepPoint] = []
+        warnings: list[str] = []
+        audience_size = request.base_request.audience_size
         for cpm in generate_sweep_cpms(request.cpm_range):
             campaign_request = CampaignRequest(
                 cpm=cpm,
@@ -711,25 +891,54 @@ def predict_sweep(request: SweepRequest) -> SweepResponse:
                 audience_size=request.base_request.audience_size,
                 user_ids=request.base_request.user_ids,
             )
-            values, drift_flag, _ = bundle.predict(campaign_request)
-            audience_size = request.base_request.audience_size
-            predicted_reach = int(round(audience_size * values["at_least_one"]))
+            try:
+                values, drift_flag, _ = bundle.predict(campaign_request, selected_user_ids)
+                sanitized = sanitize_prediction_values(values)
+                predicted_reach = calculate_predicted_reach(audience_size, sanitized["at_least_one"])
+            except InferenceOutputError:
+                log_non_finite_output(
+                    "/predict/sweep",
+                    request.base_request,
+                    cpm=cpm,
+                    selected_user_count=len(selected_user_ids),
+                )
+                warnings.append(
+                    f"Skipped CPM {cpm} because the model returned non-finite prediction values."
+                )
+                continue
+
             points.append(
                 SweepPoint(
                     cpm=cpm,
-                    at_least_one=values["at_least_one"],
-                    at_least_two=values["at_least_two"],
-                    at_least_three=values["at_least_three"],
+                    at_least_one=sanitized["at_least_one"],
+                    at_least_two=sanitized["at_least_two"],
+                    at_least_three=sanitized["at_least_three"],
                     predicted_reach=predicted_reach,
                     drift_flag=drift_flag,
                 )
             )
+
+        if not points:
+            prediction_error_count.inc()
+            if warnings:
+                detail = (
+                    "CPM sweep failed because the model returned non-finite predictions "
+                    "for all sweep points."
+                )
+            else:
+                detail = "CPM sweep failed because no valid sweep points were produced."
+            raise HTTPException(status_code=500, detail=detail)
+
         return SweepResponse(
             sweep_id=sweep_id,
             points=points,
             model_version=settings.model_version,
             latency_seconds=round(time.perf_counter() - start, 3),
+            warnings=warnings,
         )
+    except HTTPException:
+        prediction_error_count.inc()
+        raise
     except ValueError as exc:
         prediction_error_count.inc()
         raise HTTPException(status_code=422, detail=str(exc)) from exc

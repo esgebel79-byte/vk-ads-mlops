@@ -14,6 +14,7 @@ import { cn } from "@/shared/lib/cn";
 type CpmSweepControlsProps = {
   metadata?: MetadataResponse;
   isRunning: boolean;
+  modelNotReady?: boolean;
   onRun: (range: CpmSweepControlsInput) => void;
   onReset: () => void;
 };
@@ -33,6 +34,7 @@ const fieldClass = (hasError: boolean) =>
 export function CpmSweepControls({
   metadata,
   isRunning,
+  modelNotReady = false,
   onRun,
   onReset,
 }: CpmSweepControlsProps) {
@@ -158,11 +160,25 @@ export function CpmSweepControls({
         </p>
       ) : null}
 
+      {modelNotReady ? (
+        <p
+          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+          role="status"
+        >
+          {t("prediction.sweep.modelNotReadyHelper")}
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
           className={buttonPrimary}
-          disabled={isRunning || !isValid}
+          disabled={isRunning || !isValid || modelNotReady}
+          title={
+            modelNotReady
+              ? t("prediction.sweep.modelNotReadyHelper")
+              : undefined
+          }
         >
           {isRunning
             ? t("prediction.sweep.controls.running")

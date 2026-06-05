@@ -24,6 +24,7 @@ type CpmSweepChartProps = {
   points?: CpmSweepPoint[];
   cpmMeta?: CpmMetadata;
   isLoading?: boolean;
+  emptyDescription?: string;
 };
 
 type ChartRow = CpmSweepPoint & {
@@ -34,6 +35,7 @@ export function CpmSweepChart({
   points,
   cpmMeta,
   isLoading = false,
+  emptyDescription,
 }: CpmSweepChartProps) {
   const { t, i18n } = useTranslation();
   const [mode, setMode] = useState<SweepChartMode>("reach");
@@ -70,7 +72,9 @@ export function CpmSweepChart({
     return (
       <EmptyState
         title={t("prediction.sweep.chart.emptyTitle")}
-        description={t("prediction.sweep.chart.emptyDescription")}
+        description={
+          emptyDescription ?? t("prediction.sweep.chart.emptyDescription")
+        }
       />
     );
   }

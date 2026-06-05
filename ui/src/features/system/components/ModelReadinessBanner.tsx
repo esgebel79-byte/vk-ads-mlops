@@ -6,11 +6,17 @@ import { cn } from "@/shared/lib/cn";
 type ModelReadinessBannerProps = {
   health?: HealthResponse;
   metadata?: MetadataResponse;
+  /** When false, hide the green ready banner (dashboard uses a compact status strip instead). */
+  showWhenReady?: boolean;
+  /** When false, publisher targeting warnings appear only in the campaign form. */
+  showPublisherWarning?: boolean;
 };
 
 export function ModelReadinessBanner({
   health,
   metadata,
+  showWhenReady = true,
+  showPublisherWarning = true,
 }: ModelReadinessBannerProps) {
   const { t } = useTranslation();
 
@@ -23,6 +29,9 @@ export function ModelReadinessBanner({
   }
 
   if (modelReady) {
+    if (!showWhenReady) {
+      return null;
+    }
     return (
       <div
         className={cn(
@@ -71,7 +80,7 @@ export function ModelReadinessBanner({
         </div>
       </div>
 
-      {publisherEmpty ? (
+      {showPublisherWarning && publisherEmpty ? (
         <div className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
           <AlertTriangle
             className="mt-0.5 h-5 w-5 shrink-0 text-slate-500"

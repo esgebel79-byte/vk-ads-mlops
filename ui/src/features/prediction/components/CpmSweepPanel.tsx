@@ -1,10 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { MetadataResponse } from "@/features/system/types";
-import {
-  getSweepErrorDetail,
-  isModelUnavailableError,
-} from "../api";
+import { isModelUnavailableError } from "../api";
 import type { CampaignFormInput, CpmSweepControlsInput } from "../schema";
 import { buildCpmSweepRequest } from "../schema";
 import type { CpmSweepRequest, CpmSweepResponse } from "../types";
@@ -14,9 +11,11 @@ import { SweepErrorState } from "./SweepErrorState";
 import { SweepSummaryCards } from "./SweepSummaryCards";
 import { SweepUnavailableState } from "./SweepUnavailableState";
 import { Card } from "@/shared/components/Card";
+import { EmptyState } from "@/shared/components/EmptyState";
 
 type CpmSweepPanelProps = {
   metadata?: MetadataResponse;
+  modelNotReady?: boolean;
   campaignFormValues: CampaignFormInput | null;
   campaignFormValid: boolean;
   sweep: UseMutationResult<CpmSweepResponse, Error, CpmSweepRequest, unknown>;
@@ -24,6 +23,7 @@ type CpmSweepPanelProps = {
 
 export function CpmSweepPanel({
   metadata,
+  modelNotReady = false,
   campaignFormValues,
   campaignFormValid,
   sweep,
@@ -31,7 +31,7 @@ export function CpmSweepPanel({
   const { t } = useTranslation();
 
   const handleRun = (range: CpmSweepControlsInput) => {
-    if (!campaignFormValues || !campaignFormValid) {
+    if (!campaignFormValues || !campaignFormValid || modelNotReady) {
       return;
     }
     const request = buildCpmSweepRequest(campaignFormValues, range);
@@ -56,8 +56,16 @@ export function CpmSweepPanel({
       description={t("prediction.sweep.panelDescription")}
     >
       <div className="space-y-6">
-        {campaignBlocked ? (
-          <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+        {modelNotReady ? (
+          <EmptyState
+            title={t("prediction.sweep.modelNotReadyEmptyTitle")}
+            description={t("prediction.sweep.modelNotReadyEmptyDescription")}
+            className="border-slate-200 bg-slate-50/80"
+          />
+        ) : null}
+
+        {campaignBlocked && !modelNotReady ? (
+          <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
             {t("prediction.sweep.campaignInvalidHint")}
           </p>
         ) : null}
@@ -65,6 +73,7 @@ export function CpmSweepPanel({
         <CpmSweepControls
           metadata={metadata}
           isRunning={sweep.isPending}
+          modelNotReady={modelNotReady}
           onRun={handleRun}
           onReset={handleReset}
         />
@@ -73,14 +82,16 @@ export function CpmSweepPanel({
           points={sweep.data?.points}
           cpmMeta={metadata?.cpm}
           isLoading={sweep.isPending}
+          emptyDescription={
+            modelNotReady
+              ? t("prediction.sweep.modelNotReadyChartEmpty")
+              : undefined
+          }
         />
 
         {sweep.isError ? (
           isModelUnavailableError(sweep.error) ? (
-            <SweepUnavailableState
-              detail={getSweepErrorDetail(sweep.error)}
-              onRetry={handleRetry}
-            />
+            <SweepUnavailableState onRetry={handleRetry} />
           ) : (
             <SweepErrorState error={sweep.error} onRetry={handleRetry} />
           )

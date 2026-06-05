@@ -6,7 +6,14 @@ import { ErrorState } from "@/shared/components/ErrorState";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 
-export function HealthStatusCard() {
+type HealthStatusCardProps = {
+  /** When false, artifact paths are omitted (shown under Technical details on System status). */
+  includeArtifacts?: boolean;
+};
+
+export function HealthStatusCard({
+  includeArtifacts = true,
+}: HealthStatusCardProps) {
   const { t } = useTranslation();
   const { data, isLoading, isError, refetch, isFetching } = useHealth();
 
@@ -66,7 +73,7 @@ export function HealthStatusCard() {
             </div>
           </dl>
 
-          {data.artifacts ? (
+          {includeArtifacts && data.artifacts ? (
             <div>
               <h3 className="mb-3 text-sm font-semibold text-slate-800">
                 {t("health.artifacts")}

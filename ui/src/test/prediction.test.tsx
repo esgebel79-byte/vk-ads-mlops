@@ -83,12 +83,17 @@ describe("PredictionResultCards", () => {
 });
 
 describe("PredictionUnavailableState", () => {
-  it("renders unavailable messaging", () => {
-    renderWithProviders(<PredictionUnavailableState detail="Model file missing" />);
+  it("renders marketer-facing unavailable messaging without technical detail", () => {
+    renderWithProviders(<PredictionUnavailableState />);
     expect(
-      screen.getByRole("alert"),
-    ).toHaveTextContent("Prediction service is unavailable");
-    expect(screen.getByRole("alert")).toHaveTextContent("Model file missing");
+      screen.getByText("Prediction service unavailable"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Prediction service is unavailable because model artifacts are missing or not loaded/,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Model file missing")).not.toBeInTheDocument();
   });
 });
 
@@ -106,8 +111,8 @@ describe("CampaignForm", () => {
         onResetResults={vi.fn()}
       />,
     );
-    expect(screen.getByLabelText("CPM (cost per mille)")).toBeInTheDocument();
-    expect(screen.getByLabelText("Audience size")).toBeInTheDocument();
+    expect(screen.getByLabelText("CPM bid")).toBeInTheDocument();
+    expect(screen.getByLabelText("Estimated audience size")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Calculate prediction" }),
     ).toBeInTheDocument();
@@ -123,7 +128,7 @@ describe("CampaignForm", () => {
         onResetResults={vi.fn()}
       />,
     );
-    const cpmInput = screen.getByLabelText("CPM (cost per mille)");
+    const cpmInput = screen.getByLabelText("CPM bid");
     await user.clear(cpmInput);
     await user.type(cpmInput, "-5");
     await waitFor(() => {

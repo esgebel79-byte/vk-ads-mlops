@@ -20,6 +20,7 @@ import { cn } from "@/shared/lib/cn";
 type CampaignFormProps = {
   metadata?: MetadataResponse;
   isSubmitting: boolean;
+  modelNotReady?: boolean;
   onSubmit: (request: ReturnType<typeof formValuesToCampaignRequest>) => void;
   onResetResults: () => void;
   onCpmChange?: (cpm: number) => void;
@@ -37,6 +38,7 @@ const buttonSecondary =
 export function CampaignForm({
   metadata,
   isSubmitting,
+  modelNotReady = false,
   onSubmit,
   onResetResults,
   onCpmChange,
@@ -178,11 +180,23 @@ export function CampaignForm({
         errorMessage={errors.user_ids_raw?.message}
       />
 
+      {modelNotReady ? (
+        <p
+          className="rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-2 text-xs text-amber-950"
+          role="status"
+        >
+          {t("prediction.form.modelNotReadyHelper")}
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap gap-3 border-t border-surface-border pt-4">
         <button
           type="submit"
           className={buttonPrimary}
-          disabled={isSubmitting || !isValid}
+          disabled={isSubmitting || !isValid || modelNotReady}
+          title={
+            modelNotReady ? t("prediction.form.modelNotReadyHelper") : undefined
+          }
         >
           {isSubmitting
             ? t("prediction.form.submitting")

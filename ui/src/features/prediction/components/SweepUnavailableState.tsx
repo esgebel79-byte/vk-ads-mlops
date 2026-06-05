@@ -1,27 +1,20 @@
 import { useTranslation } from "react-i18next";
-import { ErrorState } from "@/shared/components/ErrorState";
+import { EmptyState } from "@/shared/components/EmptyState";
 
 type SweepUnavailableStateProps = {
-  detail?: string;
   onRetry?: () => void;
 };
 
 export function SweepUnavailableState({
-  detail,
-  onRetry,
+  onRetry: _onRetry,
 }: SweepUnavailableStateProps) {
   const { t } = useTranslation();
 
   return (
-    <ErrorState
+    <EmptyState
       title={t("prediction.sweep.unavailable.title")}
-      description={
-        detail
-          ? `${t("prediction.sweep.unavailable.description")} ${detail}`
-          : t("prediction.sweep.unavailable.description")
-      }
-      onRetry={onRetry}
-      className="border-amber-200 bg-amber-50/80 text-left"
+      description={t("prediction.sweep.unavailable.description")}
+      className="border-amber-200/80 bg-amber-50/50"
     />
   );
 }

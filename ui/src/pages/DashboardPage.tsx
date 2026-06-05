@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { CampaignPredictionPanel } from "@/features/prediction/components/CampaignPredictionPanel";
-import { HealthStatusCard } from "@/features/system/components/HealthStatusCard";
-import { MetadataCard } from "@/features/system/components/MetadataCard";
+import { DashboardStatusStrip } from "@/features/system/components/DashboardStatusStrip";
 import { ModelReadinessBanner } from "@/features/system/components/ModelReadinessBanner";
 import { useHealth, useMetadata } from "@/features/system/hooks";
 
@@ -27,24 +26,13 @@ export function DashboardPage() {
       <ModelReadinessBanner
         health={health.data}
         metadata={metadata.data}
+        showWhenReady={false}
+        showPublisherWarning={false}
       />
 
       <CampaignPredictionPanel />
 
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            {t("dashboard.overviewTitle")}
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {t("dashboard.overviewDescription")}
-          </p>
-        </div>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <HealthStatusCard />
-          <MetadataCard />
-        </div>
-      </section>
+      <DashboardStatusStrip />
     </div>
   );
 }

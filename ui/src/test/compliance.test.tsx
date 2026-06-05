@@ -131,11 +131,9 @@ describe("requirements compliance", () => {
           onResetResults={vi.fn()}
         />,
       );
-      expect(
-        screen.getByText("Target segment / publisher group"),
-      ).toBeInTheDocument();
-      expect(screen.getByText("Publisher 101")).toBeInTheDocument();
-      expect(screen.getByText("Publisher 204")).toBeInTheDocument();
+      expect(screen.getByText("Target segment")).toBeInTheDocument();
+      expect(screen.getByText("Segment 101")).toBeInTheDocument();
+      expect(screen.getByText("Segment 204")).toBeInTheDocument();
     });
 
     it("requires segment selection when publisher_universe is available", async () => {
@@ -168,7 +166,7 @@ describe("requirements compliance", () => {
       );
       expect(
         screen.getByText(
-          /The request can be sent without segment filtering, but targeting options are limited/,
+          /Publisher segment metadata is not available, so this request will be sent without segment filtering/,
         ),
       ).toBeInTheDocument();
       await waitFor(() => {
@@ -194,7 +192,7 @@ describe("requirements compliance", () => {
           onResetResults={vi.fn()}
         />,
       );
-      const cpmInput = screen.getByLabelText("CPM (cost per mille)");
+      const cpmInput = screen.getByLabelText("CPM bid");
       expect(cpmInput).toHaveAttribute("step", "0.1");
     });
   });
@@ -232,7 +230,7 @@ describe("requirements compliance", () => {
       expect(screen.getByText("Unknown")).toBeInTheDocument();
       expect(
         screen.getByText(
-          "Winning probability cannot be calculated because competitor CPM thresholds are unavailable.",
+          /Winning probability is unavailable because competitor CPM thresholds are not provided/,
         ),
       ).toBeInTheDocument();
       expect(screen.queryByText("100%")).not.toBeInTheDocument();
@@ -248,7 +246,9 @@ describe("requirements compliance", () => {
           metadata={metadataWithPublishers}
         />,
       );
-      expect(screen.getByText("Session burnout")).toBeInTheDocument();
+      expect(
+        screen.getByText("Session frequency limitation"),
+      ).toBeInTheDocument();
       expect(
         screen.getByText(/4-hour inactivity window expires/),
       ).toBeInTheDocument();

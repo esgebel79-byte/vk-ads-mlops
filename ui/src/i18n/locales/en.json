@@ -22,32 +22,43 @@
   },
   "dashboard": {
     "heroTitle": "Campaign reach forecasting",
-    "heroDescription": "Configure your campaign inputs and calculate predicted unique reach using the live inference model.",
-    "overviewTitle": "System overview",
-    "overviewDescription": "Quick health and metadata summary for operators. Use System status for full detail."
+    "heroDescription": "Configure campaign parameters, estimate unique reach, and understand auction behavior with the live prediction service.",
+    "statusStrip": {
+      "ariaLabel": "Service snapshot",
+      "title": "Service snapshot",
+      "serviceStatus": "Prediction service",
+      "modelVersion": "Model version",
+      "predictionReadiness": "Prediction readiness",
+      "segmentAvailability": "Targeting options",
+      "segmentsAvailable": "{{count}} segments available",
+      "segmentsLimited": "Limited",
+      "segmentsUnknown": "Checking…",
+      "hint": "Operational and artifact details are on the {{link}} page."
+    }
   },
   "prediction": {
     "panel": {
       "title": "Campaign prediction",
-      "description": "Enter CPM, forecast window, audience size, and optional targeting to generate impression probabilities and estimated unique reach."
+      "description": "Set the campaign bid, forecast duration, audience size, and optional targeting to estimate reach and impression probabilities."
     },
     "form": {
-      "cardTitle": "Campaign inputs",
-      "cardDescription": "All fields map directly to the prediction API. Forecast duration starts at hour 0 automatically.",
-      "cpmLabel": "CPM (cost per mille)",
-      "cpmHelper": "CPM is the bid cost per one thousand ad impressions.",
-      "cpmTooltip": "CPM is the bid cost per one thousand ad impressions.",
+      "cardTitle": "Campaign setup",
+      "cardDescription": "Configure bid, duration, audience, and targeting. The forecast window starts at hour 0.",
+      "cpmLabel": "CPM bid",
+      "cpmHelper": "Cost per 1,000 ad impressions.",
+      "cpmTooltip": "Cost per 1,000 ad impressions.",
       "forecastLabel": "Forecast duration",
       "forecastHelper": "How long the campaign is expected to run, in hours from the start of the window.",
       "forecastTooltip": "The forecast window defines how many hours of campaign activity the model evaluates, starting from hour 0.",
-      "audienceLabel": "Audience size",
-      "audienceHelper": "Total audience size used as the reach denominator for unique reach estimation.",
-      "publishersLabel": "Target segment / publisher group",
-      "publishersHelper": "Segments are currently represented by publisher groups provided by backend metadata.",
-      "publishersTooltip": "Select one or more publisher groups to narrow delivery. IDs come from backend metadata.",
-      "publisherItem": "Publisher {{id}}",
-      "publishersUnavailableTitle": "Publisher metadata unavailable",
-      "publishersUnavailableDescription": "Publisher metadata is not available. The request can be sent without segment filtering, but targeting options are limited.",
+      "audienceLabel": "Estimated audience size",
+      "audienceHelper": "Total audience size used to estimate unique reach.",
+      "publishersLabel": "Target segment",
+      "publishersHelper": "Optional publisher groups to narrow delivery when segment metadata is available.",
+      "publishersTooltip": "Select one or more segments to focus delivery.",
+      "publisherItem": "Segment {{id}}",
+      "publishersUnavailableTitle": "Targeting options are limited",
+      "publishersUnavailableDescription": "Publisher segment metadata is not available, so this request will be sent without segment filtering.",
+      "modelNotReadyHelper": "Prediction will be available after the model artifacts are loaded.",
       "advancedTitle": "Advanced targeting options",
       "userIdsLabel": "User IDs (optional)",
       "userIdsPlaceholder": "e.g. 1001, 1002, 1003",
@@ -94,11 +105,11 @@
       "metadataUnavailableDescription": "Service metadata could not be loaded. Form defaults and alerts may be limited.",
       "publisherEmptyTitle": "Publisher metadata unavailable",
       "publisherEmptyDescription": "Publisher metadata is not available. The request can be sent without segment filtering, but targeting options are limited.",
-      "sessionSilenceTitle": "Session limitation",
+      "sessionSilenceTitle": "Session frequency limitation",
       "sessionSilenceDescription": "Ads already seen by a user are not shown repeatedly within the same session. The session resets after up to {{hours}} hours of inactivity.",
       "sessionSilenceHelp": "Users who already saw the ad in the same session may not see it again until the inactivity window expires.",
       "driftTitle": "Distribution drift detected",
-      "driftDescription": "This campaign configuration may be outside the model's typical training distribution. Interpret results with extra care.",
+      "driftDescription": "The selected campaign parameters may be outside the model's usual training distribution.",
       "driftHelp": "Drift means your campaign settings differ from patterns the model saw during training.",
       "cpmGuaranteedWinTitle": "Likely guaranteed auction win",
       "cpmGuaranteedWinDescription": "Your CPM is above the maximum competitor CPM from metadata, which often indicates a likely guaranteed auction win.",
@@ -106,8 +117,8 @@
       "cpmEdgeCaseDescription": "Your CPM is approximately equal to the maximum competitor CPM. Auction outcomes may be uncertain (~50% win scenarios).",
       "cpmLowTitle": "Low auction competitiveness",
       "cpmLowDescription": "Your CPM is below the median competitor CPM. Reach may be limited unless you increase bid competitiveness.",
-      "cpmThresholdsUnavailableTitle": "Competitor CPM thresholds unavailable",
-      "cpmThresholdsUnavailableDescription": "Competitor CPM thresholds are not available from backend metadata."
+      "cpmThresholdsUnavailableTitle": "Auction thresholds unavailable",
+      "cpmThresholdsUnavailableDescription": "Auction thresholds are not available from the backend."
     },
     "unavailable": {
       "title": "Prediction service unavailable",
@@ -119,8 +130,12 @@
     },
     "sweep": {
       "panelTitle": "CPM sensitivity sweep",
-      "panelDescription": "Explore how predicted reach and impression probabilities change across a CPM range using your current campaign settings.",
-      "campaignInvalidHint": "Complete valid campaign inputs on the left before running a sweep.",
+      "panelDescription": "Explore how predicted reach and impression probabilities change across a CPM range.",
+      "campaignInvalidHint": "Complete valid campaign inputs before running a sweep.",
+      "modelNotReadyHelper": "CPM sweep will be available when the prediction model is ready.",
+      "modelNotReadyEmptyTitle": "CPM sweep not available yet",
+      "modelNotReadyEmptyDescription": "Run a CPM sweep after the prediction model becomes available.",
+      "modelNotReadyChartEmpty": "Run a CPM sweep after the prediction model becomes available.",
       "controls": {
         "ariaLabel": "CPM sweep range configuration",
         "minLabel": "Minimum CPM",
@@ -174,7 +189,7 @@
       },
       "unavailable": {
         "title": "CPM sweep unavailable",
-        "description": "CPM sweep is unavailable because the prediction model artifacts are missing or not loaded."
+        "description": "CPM sweep is unavailable because the prediction model is not ready."
       },
       "errors": {
         "validationTitle": "Invalid sweep configuration",
@@ -196,15 +211,15 @@
       "thresholdsLimitedDescription": "Competitor CPM statistics are not available from backend metadata. Win-rate guidance is unavailable until thresholds are provided.",
       "driftTitle": "Model distribution warning",
       "driftDescription": "One or more sweep points are flagged for distribution drift. Interpret reach curves with extra care.",
-      "sessionBurnoutTitle": "Session burnout",
+      "sessionBurnoutTitle": "Session frequency limitation",
       "sessionBurnoutDescription": "Ads already seen by a user in the same session may not be shown again until the {{hours}}-hour inactivity window expires. This can reduce final reach for long campaigns.",
       "sessionBurnoutHelp": "Users who already saw the ad in the same session may not see it again until the inactivity window expires.",
       "driftHelp": "Drift means your campaign settings differ from patterns the model saw during training."
     },
     "winProbability": {
       "title": "Winning probability",
-      "subtitle": "Auction win outlook based on your CPM versus competitor thresholds from backend metadata.",
-      "help": "Estimated auction win likelihood from competitor CPM thresholds. Guaranteed and edge-rate cases use the maximum competitor CPM.",
+      "subtitle": "Estimated auction outcome based on your CPM compared with historical competitor bids.",
+      "help": "Estimated auction outcome based on your CPM compared with historical competitor bids.",
       "statusGuaranteed": "Likely guaranteed win",
       "statusEdge": "Edge rate (~50%)",
       "statusLow": "Low competitiveness",
@@ -214,7 +229,7 @@
       "descriptionGuaranteed": "Your CPM is above the maximum competitor CPM, which often indicates a likely guaranteed auction win.",
       "descriptionEdge": "Your CPM is approximately equal to the maximum competitor CPM. Auction outcomes may be uncertain (~50% win scenarios).",
       "descriptionLow": "Your CPM is below the median competitor CPM. Win probability is limited without increasing bid competitiveness.",
-      "descriptionUnknown": "Winning probability cannot be calculated because competitor CPM thresholds are unavailable.",
+      "descriptionUnknown": "Winning probability is unavailable because competitor CPM thresholds are not provided by the backend.",
       "descriptionNeutral": "Your CPM is within the typical competitive range between median and maximum competitor thresholds."
     }
   },
@@ -304,10 +319,17 @@
   },
   "system": {
     "title": "System status",
-    "description": "Detailed backend health, artifact checks, and service metadata for operations teams.",
+    "description": "Backend health, model readiness, artifacts, and service metadata for ML and operations teams.",
+    "operatorHint": "Use this page for technical diagnostics. The dashboard focuses on campaign forecasting for marketers.",
     "refresh": "Refresh data",
     "lastUpdated": "Last updated",
-    "neverUpdated": "Not loaded yet"
+    "neverUpdated": "Not loaded yet",
+    "technicalDetails": {
+      "title": "Technical details",
+      "description": "Artifact paths, full metadata tables, and low-level readiness checks.",
+      "expand": "Show",
+      "collapse": "Hide"
+    }
   },
   "health": {
     "title": "Backend health",
@@ -359,7 +381,7 @@
   },
   "modelReadiness": {
     "notReadyTitle": "Prediction model is not ready",
-    "notReadyDescription": "The prediction model is not available yet because required artifacts are missing or not loaded. Reach forecasts will be unavailable until all artifacts are present and the model is loaded.",
+    "notReadyDescription": "Reach forecasts and CPM sweep are unavailable until model artifacts are loaded. Configure campaigns now; run predictions when the service is ready.",
     "loadedButNotReady": "The model file may be present, but supporting data artifacts are still missing.",
     "publisherEmptyTitle": "Publisher metadata unavailable",
     "publisherEmptyDescription": "Publisher metadata is not available. The prediction form will be limited until backend artifacts are available.",

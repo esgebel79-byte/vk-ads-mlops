@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { ErrorState } from "@/shared/components/ErrorState";
 import { getSweepErrorDetail, isValidationError } from "../api";
+import { sanitizeMarketerErrorDetail } from "@/shared/lib/sanitizeErrorDetail";
 
 type SweepErrorStateProps = {
   error: unknown;
@@ -15,7 +16,8 @@ export function SweepErrorState({ error, onRetry }: SweepErrorStateProps) {
     : t("prediction.sweep.errors.genericTitle");
 
   const description =
-    getSweepErrorDetail(error) ?? t("prediction.sweep.errors.genericDescription");
+    sanitizeMarketerErrorDetail(getSweepErrorDetail(error)) ??
+    t("prediction.sweep.errors.genericDescription");
 
   return (
     <ErrorState
