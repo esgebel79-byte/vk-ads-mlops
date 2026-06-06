@@ -112,10 +112,10 @@ describe("Dashboard UX cleanup (Phase 5.6)", () => {
       await screen.findByRole("heading", { name: "Campaign prediction" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /Set the campaign bid, forecast duration, audience size, and optional targeting/,
-      ),
-    ).toBeInTheDocument();
+      screen.getAllByText(
+        /Set the campaign bid, audience size, duration, and target segment/,
+      ).length,
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it("does not render raw artifact paths on the dashboard", async () => {
@@ -148,15 +148,15 @@ describe("Dashboard UX cleanup (Phase 5.6)", () => {
     });
     expect(
       await screen.findByText(
-        /Prediction will be available after the model artifacts are loaded/,
+        /Prediction will be available after the prediction service is ready/,
       ),
     ).toBeInTheDocument();
   });
 
-  it("disables Run CPM sweep when model is not ready", async () => {
+  it("disables Analyze CPM range when model is not ready", async () => {
     renderWithProviders(<DashboardPage />);
     const runButton = await screen.findByRole("button", {
-      name: "Run CPM sweep",
+      name: "Analyze CPM range",
     });
     await waitFor(() => {
       expect(runButton).toBeDisabled();
@@ -184,8 +184,9 @@ describe("Dashboard UX cleanup (Phase 5.6)", () => {
       />,
     );
     expect(screen.getByText("Target segment")).toBeInTheDocument();
-    expect(screen.getByText("Segment 101")).toBeInTheDocument();
+    expect(screen.getByText("Segment 1")).toBeInTheDocument();
     expect(screen.queryByText("Publisher IDs")).not.toBeInTheDocument();
+    expect(screen.queryByText(/hour 0/i)).not.toBeInTheDocument();
   });
 
   it("winning probability unknown state has no fake percentages", () => {
@@ -211,6 +212,123 @@ describe("Dashboard UX cleanup (Phase 5.6)", () => {
     await user.click(screen.getByRole("button", { name: "Русский" }));
     await waitFor(() => {
       expect(i18n.language).toMatch(/^ru/);
+    });
+  });
+});
+
+describe("Audience sampling UX (Phase 5.9)", () => {
+  const metadataReady: MetadataResponse = {
+    ...metadataNotReady,
+    model_ready: true,
+    model_loaded: true,
+    publisher_universe: [101, 204],
+    cpm: {
+      min: 0,
+      max: 100,
+      step: 5,
+      median_competitor_cpm: 10,
+      max_competitor_cpm: 20,
+      source: "artifact",
+    },
+  };
+
+  beforeEach(() => {
+    void i18n.changeLanguage("en");
+    vi.mocked(systemApi.getHealth).mockResolvedValue({
+      ...healthWithTechnicalArtifacts,
+      model_ready: true,
+      model_loaded: true,
+    });
+    vi.mocked(systemApi.getMetadata).mockResolvedValue(metadataReady);
+  });
+
+  it("does not render a visible User IDs input on the dashboard", async () => {
+    renderWithProviders(<DashboardPage />);
+    await screen.findByLabelText("Estimated audience size");
+    expect(screen.queryByLabelText(/User IDs/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /User IDs/i })).not.toBeInTheDocument();
+  });
+
+  it("does not render User IDs (optional) text", async () => {
+    renderWithProviders(<DashboardPage />);
+    await screen.findByLabelText("Estimated audience size");
+    expect(screen.queryByText("User IDs (optional)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Advanced targeting options")).not.toBeInTheDocument();
+  });
+
+  it("renders Estimated audience size label and sampling helper text", () => {
+    renderWithProviders(
+      <CampaignForm
+        metadata={metadataReady}
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        onResetResults={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText("Estimated audience size")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /The system uses a representative audience sample automatically/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("submits predict payload with user_ids empty array", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderWithProviders(
+      <CampaignForm
+        metadata={metadataReady}
+        isSubmitting={false}
+        onSubmit={onSubmit}
+        onResetResults={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByText("Segment 1"));
+    await user.click(
+      screen.getByRole("button", { name: "Calculate prediction" }),
+    );
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_ids: [],
+          audience_size: 1000,
+          publishers: [101],
+        }),
+      );
+    });
+  });
+
+  it("shows target segment marketer-friendly label", () => {
+    renderWithProviders(
+      <CampaignForm
+        metadata={metadataReady}
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        onResetResults={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Target segment")).toBeInTheDocument();
+  });
+
+  it("language switcher still works for audience sampling copy", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <LanguageSwitcher />
+        <CampaignForm
+          metadata={metadataReady}
+          isSubmitting={false}
+          onSubmit={vi.fn()}
+          onResetResults={vi.fn()}
+        />
+      </>,
+    );
+    await user.click(screen.getByRole("button", { name: "Русский" }));
+    await waitFor(() => {
+      expect(
+        screen.getByText(/репрезентативную выборку аудитории/),
+      ).toBeInTheDocument();
     });
   });
 });

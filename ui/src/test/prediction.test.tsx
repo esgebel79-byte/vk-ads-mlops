@@ -9,7 +9,11 @@ import i18n from "@/i18n";
 import { CampaignForm } from "@/features/prediction/components/CampaignForm";
 import { PredictionResultCards } from "@/features/prediction/components/PredictionResultCards";
 import { PredictionUnavailableState } from "@/features/prediction/components/PredictionUnavailableState";
-import { parseUserIdsRaw } from "@/features/prediction/schema";
+import {
+  parseUserIdsRaw,
+  formValuesToCampaignRequest,
+  buildCpmSweepRequest,
+} from "@/features/prediction/schema";
 import type { MetadataResponse } from "@/features/system/types";
 
 const metadataFixture: MetadataResponse = {
@@ -29,7 +33,7 @@ const metadataFixture: MetadataResponse = {
     mode: "absolute_hours",
     min_hour: 0,
     max_hour: 168,
-    recommended_presets: [6, 12, 24],
+    recommended_presets: [6, 12, 24, 48],
     session_silence_window_hours: 4,
   },
   limits: {
@@ -59,6 +63,38 @@ describe("prediction utilities", () => {
 
   it("rejects non-integer user IDs", () => {
     expect(() => parseUserIdsRaw("1, 2.5")).toThrow();
+  });
+
+  it("builds campaign request with empty user_ids", () => {
+    const request = formValuesToCampaignRequest({
+      cpm: 15,
+      forecast_duration_hours: 24,
+      publishers: [101],
+      audience_size: 5000,
+    });
+    expect(request).toEqual({
+      cpm: 15,
+      hour_start: 0,
+      hour_end: 24,
+      publishers: [101],
+      audience_size: 5000,
+      user_ids: [],
+    });
+  });
+
+  it("builds sweep base_request with empty user_ids", () => {
+    const request = buildCpmSweepRequest(
+      {
+        cpm: 10,
+        forecast_duration_hours: 12,
+        publishers: [204],
+        audience_size: 2000,
+      },
+      { min: 0, max: 50, step: 5 },
+    );
+    expect(request.base_request.user_ids).toEqual([]);
+    expect(request.base_request.publishers).toEqual([204]);
+    expect(request.cpm_range).toEqual({ min: 0, max: 50, step: 5 });
   });
 });
 
@@ -90,7 +126,7 @@ describe("PredictionUnavailableState", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Prediction service is unavailable because model artifacts are missing or not loaded/,
+        /Prediction service is unavailable because the model is not ready/,
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Model file missing")).not.toBeInTheDocument();
@@ -102,7 +138,7 @@ describe("CampaignForm", () => {
     void i18n.changeLanguage("en");
   });
 
-  it("renders campaign form fields", () => {
+  it("renders campaign form fields in marketer-friendly order", () => {
     renderWithProviders(
       <CampaignForm
         metadata={metadataFixture}
@@ -113,9 +149,41 @@ describe("CampaignForm", () => {
     );
     expect(screen.getByLabelText("CPM bid")).toBeInTheDocument();
     expect(screen.getByLabelText("Estimated audience size")).toBeInTheDocument();
+    expect(screen.getByText("Forecast duration")).toBeInTheDocument();
+    expect(screen.getByText("Target segment")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Calculate prediction" }),
     ).toBeInTheDocument();
+  });
+
+  it("renders CPM helper with 1,000 ad impressions", () => {
+    renderWithProviders(
+      <CampaignForm
+        metadata={metadataFixture}
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        onResetResults={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText("Cost per 1,000 ad impressions."),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render hour 0 or User IDs on the form", () => {
+    const { container } = renderWithProviders(
+      <CampaignForm
+        metadata={metadataFixture}
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        onResetResults={vi.fn()}
+      />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/hour 0/i);
+    expect(text).not.toMatch(/hour_start/);
+    expect(text).not.toMatch(/User IDs/i);
+    expect(text).not.toMatch(/user_ids/);
   });
 
   it("shows validation for negative CPM", async () => {
@@ -137,5 +205,114 @@ describe("CampaignForm", () => {
     expect(
       screen.getByRole("button", { name: "Calculate prediction" }),
     ).toBeDisabled();
+  });
+
+  it("forecast duration buttons are clickable and show active state", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <CampaignForm
+        metadata={metadataFixture}
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        onResetResults={vi.fn()}
+      />,
+    );
+    const button12h = screen.getByRole("button", { name: "12 h" });
+    const button24h = screen.getByRole("button", { name: "24 h" });
+    expect(button24h).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(button12h);
+    await waitFor(() => {
+      expect(button12h).toHaveAttribute("aria-pressed", "true");
+      expect(button24h).toHaveAttribute("aria-pressed", "false");
+    });
+  });
+
+  it("selecting forecast duration clears required validation error", async () => {
+    const user = userEvent.setup();
+    const metadataNoDefault24: MetadataResponse = {
+      ...metadataFixture,
+      time: {
+        ...metadataFixture.time,
+        recommended_presets: [6, 12],
+      },
+    };
+    renderWithProviders(
+      <CampaignForm
+        metadata={metadataNoDefault24}
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        onResetResults={vi.fn()}
+      />,
+    );
+    const button6h = screen.getByRole("button", { name: "6 h" });
+    await user.click(button6h);
+    await waitFor(() => {
+      expect(
+        screen.queryByText("This field is required."),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("uses selected duration as hour_end in predict payload", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderWithProviders(
+      <CampaignForm
+        metadata={metadataFixture}
+        isSubmitting={false}
+        onSubmit={onSubmit}
+        onResetResults={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "12 h" }));
+    await user.click(screen.getByText("Segment 1"));
+    await user.click(
+      screen.getByRole("button", { name: "Calculate prediction" }),
+    );
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hour_start: 0,
+          hour_end: 12,
+          user_ids: [],
+          publishers: [101],
+        }),
+      );
+    });
+  });
+
+  it("requires at least one target segment when segments are available", async () => {
+    renderWithProviders(
+      <CampaignForm
+        metadata={metadataFixture}
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        onResetResults={vi.fn()}
+      />,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("alert"),
+      ).toHaveTextContent(/Select at least one target segment/);
+    });
+    expect(
+      screen.getByRole("button", { name: "Calculate prediction" }),
+    ).toBeDisabled();
+  });
+
+  it("displays marketer-friendly segment labels", () => {
+    renderWithProviders(
+      <CampaignForm
+        metadata={metadataFixture}
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        onResetResults={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Segment 1")).toBeInTheDocument();
+    expect(screen.getByText("Segment 2")).toBeInTheDocument();
+    expect(screen.queryByText("Segment 101")).not.toBeInTheDocument();
+    expect(screen.queryByText("publisher_universe")).not.toBeInTheDocument();
   });
 });

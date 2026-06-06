@@ -77,6 +77,21 @@ From the repository root, start the inference API (see main project docs), then 
 - **Unavailable states** — missing model artifacts show calm warning/neutral copy (not raw `/app/...` paths or `.npy` filenames on the dashboard).
 - **i18n** — all visible dashboard and system strings live in `src/i18n/locales/en.json` and `ru.json`.
 
+## Marketer-focused Dashboard UX (Phase 5.10)
+
+- Dashboard hides technical user IDs, `hour_start`/`hour_end` labels, and backend metadata from the campaign form.
+- Forecast duration is mapped internally to backend `hour_start: 0` and `hour_end: selected duration`.
+- Target segments are shown with marketer-friendly labels (Segment 1, Segment 2, …) while preserving backend publisher IDs in the API payload.
+- Backend still receives the correct request shape including `user_ids: []`.
+
+## Audience sampling UX (Phase 5.9)
+
+- The Dashboard is designed for **marketers**, not developers.
+- Marketers provide **estimated audience size** and **target segment / publisher group** — no raw user IDs in the main campaign flow.
+- The backend handles empty `user_ids` by **automatic audience sampling**; the frontend always sends `user_ids: []` from the dashboard form.
+- Helper copy explains representative sampling without exposing internal identifiers or backend mechanics.
+- Developer/testing support for optional `user_ids` remains **backend-side** if needed; the System status page retains technical diagnostics.
+
 ## Phase 5 features
 
 - **Prediction history page** (`/history`) — table of recent predictions with summary cards, client-side filters, sort, refresh, and CSV export
@@ -170,7 +185,7 @@ All visible UI strings live in `src/i18n/locales/en.json` and `ru.json`. Use the
 npm run test
 ```
 
-Unit tests mock API modules; no live backend is required. Coverage includes dashboard UX cleanup (no artifact paths on dashboard, single readiness banner, disabled actions when model not ready), requirements compliance (segment labels/validation, CPM step, win probability indicator, session limitation), history normalization, summary metrics, filtering, sorting, CSV export, history page empty state, details drawer, system technical details accordion, and language switcher.
+Unit tests mock API modules; no live backend is required. Coverage includes audience sampling UX (no user ID fields on dashboard, empty `user_ids` in payloads, sampling helper copy), dashboard UX cleanup (no artifact paths on dashboard, single readiness banner, disabled actions when model not ready), requirements compliance (segment labels/validation, CPM step, win probability indicator, session limitation), history normalization, summary metrics, filtering, sorting, CSV export, history page empty state, details drawer, system technical details accordion, and language switcher.
 
 ## Limitations
 

@@ -132,8 +132,8 @@ describe("requirements compliance", () => {
         />,
       );
       expect(screen.getByText("Target segment")).toBeInTheDocument();
-      expect(screen.getByText("Segment 101")).toBeInTheDocument();
-      expect(screen.getByText("Segment 204")).toBeInTheDocument();
+      expect(screen.getByText("Segment 1")).toBeInTheDocument();
+      expect(screen.getByText("Segment 2")).toBeInTheDocument();
     });
 
     it("requires segment selection when publisher_universe is available", async () => {
@@ -166,7 +166,7 @@ describe("requirements compliance", () => {
       );
       expect(
         screen.getByText(
-          /Publisher segment metadata is not available, so this request will be sent without segment filtering/,
+          /Segment targeting is not available right now/,
         ),
       ).toBeInTheDocument();
       await waitFor(() => {
@@ -176,7 +176,7 @@ describe("requirements compliance", () => {
       });
       expect(
         screen.queryByText(
-          "Select at least one target segment / publisher group.",
+          "Select at least one target segment.",
         ),
       ).not.toBeInTheDocument();
     });

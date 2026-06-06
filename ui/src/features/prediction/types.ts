@@ -56,7 +56,6 @@ export type CampaignFormValues = {
   forecast_duration_hours: number;
   publishers: number[];
   audience_size: number;
-  user_ids_raw: string;
 };
 
 export const DEFAULT_FORECAST_PRESETS = [6, 12, 24, 48, 72, 168] as const;

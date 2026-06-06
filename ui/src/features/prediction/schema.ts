@@ -60,29 +60,8 @@ export function createCampaignFormSchema(context: SchemaContext) {
         .refine((v) => !Number.isNaN(v), { message: "required" })
         .refine((v) => Number.isInteger(v), { message: "audience_integer" })
         .refine((v) => v >= 1, { message: "audience_min" }),
-      user_ids_raw: z.string(),
     })
     .superRefine((data, ctx) => {
-      let userIds: number[] = [];
-      try {
-        userIds = parseUserIdsRaw(data.user_ids_raw);
-      } catch {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "user_ids_invalid",
-          path: ["user_ids_raw"],
-        });
-        return;
-      }
-
-      if (data.audience_size < userIds.length) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "audience_vs_users",
-          path: ["audience_size"],
-        });
-      }
-
       if (context.requirePublishers && data.publishers.length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -112,13 +91,12 @@ export type CampaignFormInput = z.infer<CampaignFormSchema>;
 export function formValuesToCampaignBaseRequest(
   values: CampaignFormInput,
 ): CampaignBaseRequest {
-  const user_ids = parseUserIdsRaw(values.user_ids_raw);
   return {
     hour_start: 0,
     hour_end: values.forecast_duration_hours,
     publishers: values.publishers,
     audience_size: values.audience_size,
-    user_ids,
+    user_ids: [],
   };
 }
 
@@ -221,5 +199,4 @@ export const defaultCampaignFormValues: CampaignFormInput = {
   forecast_duration_hours: 24,
   publishers: [],
   audience_size: 1000,
-  user_ids_raw: "",
 };

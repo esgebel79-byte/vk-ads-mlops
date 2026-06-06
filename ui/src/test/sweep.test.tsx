@@ -203,9 +203,9 @@ describe("CpmSweepControls", () => {
     );
     expect(screen.getByLabelText("Minimum CPM")).toBeInTheDocument();
     expect(screen.getByLabelText("Maximum CPM")).toBeInTheDocument();
-    expect(screen.getByLabelText("CPM step")).toBeInTheDocument();
+    expect(screen.getByLabelText("CPM interval")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Run CPM sweep" }),
+      screen.getByRole("button", { name: "Analyze CPM range" }),
     ).toBeInTheDocument();
   });
 
@@ -244,11 +244,11 @@ describe("CpmSweepControls", () => {
         onReset={vi.fn()}
       />,
     );
-    const stepInput = screen.getByLabelText("CPM step");
+    const stepInput = screen.getByLabelText("CPM interval");
     await user.clear(stepInput);
     await user.type(stepInput, "1");
     await waitFor(() => {
-      expect(screen.getAllByText(/too many points/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/too many scenarios/i).length).toBeGreaterThan(0);
     });
   });
 });
