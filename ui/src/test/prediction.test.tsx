@@ -99,6 +99,26 @@ describe("prediction utilities", () => {
 });
 
 describe("PredictionResultCards", () => {
+  it("renders probability helper tooltips", () => {
+    renderWithProviders(
+      <PredictionResultCards
+        response={{
+          at_least_one: 0.81,
+          at_least_two: 0.63,
+          at_least_three: 0.44,
+          model_version: "deepsets_attention",
+          drift_flag: false,
+          prediction_id: "test-id",
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Chance that a user sees the ad at least once.",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("renders percentages with one decimal", () => {
     renderWithProviders(
       <PredictionResultCards

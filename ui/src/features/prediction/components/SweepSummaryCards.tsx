@@ -63,16 +63,16 @@ export function SweepSummaryCards({ response }: SweepSummaryCardsProps) {
       value: response.model_version,
     },
     {
-      id: "latency",
-      label: t("prediction.sweep.summary.latency"),
+      id: "analysis-time",
+      label: t("prediction.sweep.summary.analysisTime"),
       value: formatNumber(response.latency_seconds, i18n.language, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }),
     },
     {
-      id: "drift-count",
-      label: t("prediction.sweep.summary.driftPoints"),
+      id: "unusual-scenarios",
+      label: t("prediction.sweep.summary.unusualScenarios"),
       value: formatNumber(driftCount, i18n.language, {
         maximumFractionDigits: 0,
       }),

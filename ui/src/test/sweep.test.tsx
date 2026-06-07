@@ -43,18 +43,6 @@ const metadataFixture: MetadataResponse = {
   },
 };
 
-const metadataNoThresholds: MetadataResponse = {
-  ...metadataFixture,
-  cpm: {
-    min: 0,
-    max: 100,
-    step: 5,
-    median_competitor_cpm: null,
-    max_competitor_cpm: null,
-    source: "unavailable",
-  },
-};
-
 function renderWithProviders(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -121,32 +109,26 @@ describe("AuctionIntelligencePanel", () => {
     void i18n.changeLanguage("en");
   });
 
-  it("shows threshold unavailable message when thresholds are null", () => {
+  it("shows low bid competitiveness when CPM is below median", () => {
     renderWithProviders(
-      <AuctionIntelligencePanel cpm={12} metadata={metadataNoThresholds} />,
+      <AuctionIntelligencePanel cpm={5} metadata={metadataFixture} />,
     );
+    expect(screen.getByText("Bid below competitor level")).toBeInTheDocument();
     expect(
-      screen.getByText("Auction intelligence limited"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Competitor CPM statistics are not available/),
+      screen.getByText(/Increasing the bid may improve auction performance/),
     ).toBeInTheDocument();
   });
 
-  it("shows guaranteed win when CPM exceeds max competitor CPM", () => {
+  it("shows unusual campaign pattern when predict drift is flagged", () => {
     renderWithProviders(
-      <AuctionIntelligencePanel cpm={25} metadata={metadataFixture} />,
+      <AuctionIntelligencePanel
+        cpm={15}
+        metadata={metadataFixture}
+        predictDriftFlag
+      />,
     );
-    expect(
-      screen.getByText("Likely guaranteed auction win"),
-    ).toBeInTheDocument();
-  });
-
-  it("shows edge-rate warning when CPM approximately equals max competitor CPM", () => {
-    renderWithProviders(
-      <AuctionIntelligencePanel cpm={20} metadata={metadataFixture} />,
-    );
-    expect(screen.getByText("CPM at competitor ceiling")).toBeInTheDocument();
+    expect(screen.getByText("Unusual campaign pattern")).toBeInTheDocument();
+    expect(screen.queryByText(/distribution drift/i)).not.toBeInTheDocument();
   });
 
   it("renders session burnout note", () => {
@@ -169,13 +151,15 @@ describe("auction intelligence helpers", () => {
     expect(insight.status).toBe("success");
   });
 
-  it("includes session burnout in built insights", () => {
+  it("includes session burnout and limits bid competitiveness to low CPM", () => {
     const insights = buildAuctionInsights({
-      cpm: 15,
+      cpm: 5,
       cpmMeta: metadataFixture.cpm,
       sessionSilenceHours: 4,
     });
     expect(insights.some((i) => i.kind === "session_burnout")).toBe(true);
+    expect(insights.some((i) => i.kind === "low_competitiveness")).toBe(true);
+    expect(insights.some((i) => i.kind === "guaranteed_win")).toBe(false);
   });
 
   it("includes session burnout with default hours when metadata is missing", () => {

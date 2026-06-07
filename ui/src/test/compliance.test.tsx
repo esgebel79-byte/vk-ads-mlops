@@ -230,7 +230,7 @@ describe("requirements compliance", () => {
       expect(screen.getByText("Unknown")).toBeInTheDocument();
       expect(
         screen.getByText(
-          /Winning probability is unavailable because competitor CPM thresholds are not provided/,
+          /Auction outlook is unavailable because competitor CPM benchmarks are not provided/,
         ),
       ).toBeInTheDocument();
       expect(screen.queryByText("100%")).not.toBeInTheDocument();
@@ -262,7 +262,7 @@ describe("requirements compliance", () => {
         await screen.findByRole("heading", { name: "Campaign reach forecasting" }),
       ).toBeInTheDocument();
       expect(
-        await screen.findByText("Winning probability"),
+        await screen.findByText("Auction outlook"),
       ).toBeInTheDocument();
     });
 

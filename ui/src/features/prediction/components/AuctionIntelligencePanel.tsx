@@ -22,6 +22,7 @@ type AuctionIntelligencePanelProps = {
   cpm: number;
   metadata?: MetadataResponse;
   sweepPoints?: CpmSweepPoint[];
+  predictDriftFlag?: boolean;
 };
 
 type StatusStyle = {
@@ -99,6 +100,7 @@ export function AuctionIntelligencePanel({
   cpm,
   metadata,
   sweepPoints,
+  predictDriftFlag,
 }: AuctionIntelligencePanelProps) {
   const { t } = useTranslation();
 
@@ -109,8 +111,9 @@ export function AuctionIntelligencePanel({
         cpmMeta: metadata?.cpm,
         sweepPoints,
         sessionSilenceHours: metadata?.time.session_silence_window_hours,
+        predictDriftFlag,
       }),
-    [cpm, metadata, sweepPoints],
+    [cpm, metadata, sweepPoints, predictDriftFlag],
   );
 
   const sessionHours = resolveSessionSilenceHours(

@@ -129,6 +129,7 @@ export function CampaignForm({
         min={metadata?.cpm.min}
         max={metadata?.cpm.max}
         step={resolveCpmInputStep(metadata?.cpm.step)}
+        cpmMeta={metadata?.cpm}
       />
 
       <div className="space-y-1.5">

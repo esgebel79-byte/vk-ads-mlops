@@ -199,7 +199,7 @@ describe("Dashboard UX cleanup (Phase 5.6)", () => {
     expect(screen.getByText("Unknown")).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Winning probability is unavailable because competitor CPM thresholds are not provided/,
+        /Auction outlook is unavailable because competitor CPM benchmarks are not provided/,
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("100%")).not.toBeInTheDocument();

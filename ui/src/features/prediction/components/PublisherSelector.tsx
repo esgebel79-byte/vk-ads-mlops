@@ -52,6 +52,9 @@ export function PublisherSelector({
       <p className="text-xs text-slate-500">
         {t("prediction.form.publishersHelper")}
       </p>
+      <p className="text-xs text-slate-400">
+        {t("prediction.form.publishersNamesUnavailable")}
+      </p>
       <div
         className="grid gap-2 sm:grid-cols-2"
         role="group"

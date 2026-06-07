@@ -62,6 +62,16 @@ services:
     depends_on:
       - prometheus
 
+  ui:
+    build:
+      context: ./ui
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "127.0.0.1:3001:80"
+    depends_on:
+      - api
+
 volumes:
   prometheus-data:
   grafana-data:

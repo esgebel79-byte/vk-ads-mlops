@@ -1,6 +1,9 @@
 import type { UseFormRegister } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import type { CpmMetadata } from "@/features/system/types";
+import { formatNumber } from "@/shared/lib/formatters";
 import type { CampaignFormInput } from "../schema";
+import { areCpmThresholdsAvailable } from "../lib/auctionIntelligence";
 import { FieldHelp } from "@/shared/components/FieldHelp";
 import { cn } from "@/shared/lib/cn";
 
@@ -10,10 +13,19 @@ type CpmInputProps = {
   min?: number;
   max?: number;
   step?: number;
+  cpmMeta?: CpmMetadata;
 };
 
-export function CpmInput({ register, errorMessage, min, max, step }: CpmInputProps) {
-  const { t } = useTranslation();
+export function CpmInput({
+  register,
+  errorMessage,
+  min,
+  max,
+  step,
+  cpmMeta,
+}: CpmInputProps) {
+  const { t, i18n } = useTranslation();
+  const hasBenchmarks = areCpmThresholdsAvailable(cpmMeta);
 
   return (
     <div className="space-y-1.5">
@@ -39,6 +51,18 @@ export function CpmInput({ register, errorMessage, min, max, step }: CpmInputPro
         {...register("cpm", { valueAsNumber: true })}
       />
       <p className="text-xs text-slate-500">{t("prediction.form.cpmHelper")}</p>
+      <p className="text-xs text-slate-500">
+        {hasBenchmarks
+          ? t("prediction.form.cpmBenchmark", {
+              median: formatNumber(cpmMeta!.median_competitor_cpm, i18n.language, {
+                maximumFractionDigits: 2,
+              }),
+              max: formatNumber(cpmMeta!.max_competitor_cpm, i18n.language, {
+                maximumFractionDigits: 2,
+              }),
+            })
+          : t("prediction.form.cpmBenchmarkUnavailable")}
+      </p>
       {errorMessage ? (
         <p className="text-xs text-rose-600" role="alert">
           {t(`prediction.validation.${errorMessage}`, {

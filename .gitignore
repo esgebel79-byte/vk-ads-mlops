@@ -1,10 +1,17 @@
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
 .idea/
 .venv/
 venv/
 .env
+ui/.env
 .vscode/
+
+node_modules/
+ui/node_modules/
+ui/dist/
 
 data/raw/
 data/interim/
@@ -13,6 +20,7 @@ data/processed/
 mlruns/
 artifacts/
 reports/
+coverage/
 .dvc/tmp/
 *.log
 *.tmp

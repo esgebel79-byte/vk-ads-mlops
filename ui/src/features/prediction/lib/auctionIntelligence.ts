@@ -145,22 +145,37 @@ export function resolveWinProbability(
   };
 }
 
+export function resolveForecastReliabilityInsight(params: {
+  predictDriftFlag?: boolean;
+  sweepPoints?: CpmSweepPoint[];
+}): AuctionInsight | null {
+  const hasSweepDrift = params.sweepPoints?.some((p) => p.drift_flag) ?? false;
+  if (!params.predictDriftFlag && !hasSweepDrift) {
+    return null;
+  }
+  return { kind: "drift", status: "warning" };
+}
+
 export function buildAuctionInsights(params: {
   cpm: number;
   cpmMeta: CpmMetadata | undefined;
   sweepPoints?: CpmSweepPoint[];
   sessionSilenceHours?: number;
+  predictDriftFlag?: boolean;
 }): AuctionInsight[] {
   const insights: AuctionInsight[] = [];
 
   const primary = resolvePrimaryAuctionInsight(params.cpm, params.cpmMeta);
-  if (primary.kind) {
+  if (primary.kind === "low_competitiveness") {
     insights.push(primary);
   }
 
-  const drift = resolveSweepDriftInsight(params.sweepPoints);
-  if (drift) {
-    insights.push(drift);
+  const reliability = resolveForecastReliabilityInsight({
+    predictDriftFlag: params.predictDriftFlag,
+    sweepPoints: params.sweepPoints,
+  });
+  if (reliability) {
+    insights.push(reliability);
   }
 
   insights.push(resolveSessionBurnoutInsight(params.sessionSilenceHours));

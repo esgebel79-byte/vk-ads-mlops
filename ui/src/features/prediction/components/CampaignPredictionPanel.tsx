@@ -94,12 +94,7 @@ export function CampaignPredictionPanel() {
         </div>
 
         <div className="space-y-6">
-          <PredictionAlerts
-            cpm={selectedCpm}
-            metadata={metadata.data}
-            metadataError={metadata.isError}
-            response={predict.data}
-          />
+          <PredictionAlerts metadataError={metadata.isError} />
 
           <WinProbabilityIndicator
             cpm={selectedCpm}
@@ -139,6 +134,8 @@ export function CampaignPredictionPanel() {
               <PredictionSummaryCard
                 response={predict.data}
                 audienceSize={displayAudienceSize}
+                cpm={selectedCpm}
+                cpmMeta={metadata.data?.cpm}
               />
               <PredictionResultCards response={predict.data} />
               <ProbabilityBreakdown />
@@ -157,6 +154,7 @@ export function CampaignPredictionPanel() {
             cpm={selectedCpm}
             metadata={metadata.data}
             sweepPoints={sweep.data?.points}
+            predictDriftFlag={predict.data?.drift_flag}
           />
         </div>
       </div>

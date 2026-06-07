@@ -43,3 +43,12 @@ export function computePredictedReach(
 ): number {
   return Math.round(audienceSize * atLeastOne);
 }
+
+export function isLowPredictedReach(
+  audienceSize: number,
+  atLeastOne: number,
+): boolean {
+  const reach = computePredictedReach(audienceSize, atLeastOne);
+  const relativeThreshold = Math.max(10, Math.round(audienceSize * 0.02));
+  return reach > 0 && reach < relativeThreshold;
+}
