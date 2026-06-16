@@ -1,0 +1,80 @@
+name: Release on tag — build images and create GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push API image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./services/inference_api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/vk-ads-mlops-api:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/vk-ads-mlops-api:latest
+      - name: Build and push UI image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./ui
+          file: ./ui/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/vk-ads-mlops-ui:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/vk-ads-mlops-ui:latest
+
+  create-release:
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+      - name: Package artifacts for release
+        run: |
+          set -e
+          ART=artifacts_release_${{ github.ref_name }}.zip
+          if [ -d artifacts ]; then
+            zip -r "$ART" artifacts || true
+          else
+            echo "no artifacts directory" > "$ART"
+          fi
+          echo "ARTIFACT_PATH=$ART" >> $GITHUB_ENV
+      - name: Upload artifacts to release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.ARTIFACT_PATH }}
+          asset_name: artifacts_${{ github.ref_name }}.zip
+          asset_content_type: application/zip
