@@ -17,6 +17,9 @@ services:
       ENABLE_RETRAIN: "false"
       RETRAIN_COMMAND: python -m dvc repro stage5_train_model
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      CORS_ALLOW_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:3001,http://127.0.0.1:3001
+      MAX_SWEEP_POINTS: "50"
+      SESSION_SILENCE_WINDOW_HOURS: "4"
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -58,6 +61,16 @@ services:
       - ./deployments/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
+
+  ui:
+    build:
+      context: ./ui
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "127.0.0.1:3001:80"
+    depends_on:
+      - api
 
 volumes:
   prometheus-data:
