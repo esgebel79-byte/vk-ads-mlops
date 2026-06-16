@@ -46,8 +46,8 @@ stages:
     outs:
     - path: data/interim/stage2
       hash: md5
-      md5: 4930624824b07099099a12a21a499b5f.dir
-      size: 38611659
+      md5: fc017b4352c56c8314651ad3b47c19d7.dir
+      size: 38611663
       nfiles: 5
   stage3_user_features:
     cmd: python src/features/build_user_features.py --stage1-dir 
@@ -84,8 +84,8 @@ stages:
       nfiles: 11
     - path: data/interim/stage2
       hash: md5
-      md5: 4930624824b07099099a12a21a499b5f.dir
-      size: 38611659
+      md5: fc017b4352c56c8314651ad3b47c19d7.dir
+      size: 38611663
       nfiles: 5
     - path: data/processed/stage9
       hash: md5
@@ -105,8 +105,8 @@ stages:
     outs:
     - path: data/processed/stage10
       hash: md5
-      md5: 2367566c9c280fca3f73c10d5e876245.dir
-      size: 15522485
+      md5: a677a480eaa8f7d3da29b3da8019fd0d.dir
+      size: 15522487
       nfiles: 12
   stage5_train_model:
     cmd: python src/models/train_deepsets_attention.py --stage10-dir 
@@ -141,3 +141,156 @@ stages:
       md5: 0978b2866da29e9c6d0c6f857e31ad0a.dir
       size: 4166986
       nfiles: 3
+  stage5_train_catboost_baseline:
+    cmd: python src/models/train_catboost_baseline.py --stage2-dir 
+      data/interim/stage2 --out-dir models/catboost_baseline --seed 42 --iters 
+      1000 --mlflow-tracking-uri http://127.0.0.1:5000 --mlflow-experiment 
+      vk-ads-reach-prediction
+    deps:
+    - path: data/interim/stage2
+      hash: md5
+      md5: fc017b4352c56c8314651ad3b47c19d7.dir
+      size: 38611663
+      nfiles: 5
+    - path: src/models/train_catboost_baseline.py
+      hash: md5
+      md5: b6d14c30da03b7ce70dc9d285f18eb9e
+      size: 6554
+    params:
+      params.yaml:
+        data.interim_dir: data/interim
+        mlflow.experiment: vk-ads-reach-prediction
+        mlflow.tracking_uri: http://127.0.0.1:5000
+        seed: 42
+    outs:
+    - path: models/catboost_baseline
+      hash: md5
+      md5: 63717898a8511d8a10aaafb1f3e5f16d.dir
+      size: 676832
+      nfiles: 4
+  stage6_predict_catboost_baseline:
+    cmd: python src/models/predict_catboost_baseline.py --data-dir data 
+      --models-dir models/catboost_baseline --out-dir 
+      artifacts/catboost_predictions --mlflow-tracking-uri http://127.0.0.1:5000
+      --mlflow-experiment vk-ads-reach-prediction
+    deps:
+    - path: data/raw/validate.tsv
+      hash: md5
+      md5: da694dc06c0a965a07d0495254119019
+      size: 6177346
+    - path: models/catboost_baseline
+      hash: md5
+      md5: 63717898a8511d8a10aaafb1f3e5f16d.dir
+      size: 676832
+      nfiles: 4
+    - path: src/models/predict_catboost_baseline.py
+      hash: md5
+      md5: a24338c1096dc841fd7e2c5bd14c0a19
+      size: 4770
+    params:
+      params.yaml:
+        mlflow.experiment: vk-ads-reach-prediction
+        mlflow.tracking_uri: http://127.0.0.1:5000
+    outs:
+    - path: artifacts/catboost_predictions
+      hash: md5
+      md5: 4819810f404aaeefba1addd546bce9f1.dir
+      size: 56030
+      nfiles: 1
+  stage7_evaluate_catboost_baseline:
+    cmd: python src/models/evaluate.py --data-dir data --pred-path 
+      artifacts/catboost_predictions/predictions.tsv --out-dir 
+      artifacts/catboost_evaluation --mlflow-tracking-uri http://127.0.0.1:5000 
+      --mlflow-experiment vk-ads-reach-prediction
+    deps:
+    - path: artifacts/catboost_predictions/predictions.tsv
+      hash: md5
+      md5: db14f9f32cc177fcb35d8f1696d4be5e
+      size: 56030
+    - path: data/raw/validate.tsv
+      hash: md5
+      md5: da694dc06c0a965a07d0495254119019
+      size: 6177346
+    - path: data/raw/validate_answers.tsv
+      hash: md5
+      md5: bc6b2a171c69cf6d0f06dcdd8d3f29e6
+      size: 18302
+    - path: src/models/evaluate.py
+      hash: md5
+      md5: aa98f41620051b0c136bb910b72a876d
+      size: 7365
+    params:
+      params.yaml:
+        mlflow.experiment: vk-ads-reach-prediction
+        mlflow.tracking_uri: http://127.0.0.1:5000
+    outs:
+    - path: artifacts/catboost_evaluation
+      hash: md5
+      md5: a04d5b29c1f0b6ea66355d5435b3ede4.dir
+      size: 213634
+      nfiles: 2
+  stage8_train_evaluate_deepsets_attention:
+    cmd: python src/models/train_deepsets_attention.py --stage10-dir 
+      data/processed/stage10 --out-dir models/deepsets --seed 42 --epochs 30 
+      --batch-size 128 --lr 0.002 --device auto --model-type deepsets_attention 
+      --mlflow-tracking-uri http://127.0.0.1:5000 --mlflow-experiment 
+      vk-ads-reach-prediction
+    deps:
+    - path: data/processed/stage10
+      hash: md5
+      md5: a677a480eaa8f7d3da29b3da8019fd0d.dir
+      size: 15522487
+      nfiles: 12
+    - path: src/models/train_deepsets_attention.py
+      hash: md5
+      md5: 036349fffedfa77cee28ff8bfaff9c0d
+      size: 15197
+    params:
+      params.yaml:
+        data.processed_dir: data/processed
+        mlflow.experiment: vk-ads-reach-prediction
+        mlflow.tracking_uri: http://127.0.0.1:5000
+        seed: 42
+        train.batch_size: 128
+        train.device: auto
+        train.epochs: 30
+        train.lr: 0.002
+        train.model_type: deepsets_attention
+    outs:
+    - path: models/deepsets
+      hash: md5
+      md5: df3859f89464382d4697cebf2427ca78.dir
+      size: 4166987
+      nfiles: 3
+  stage9_evaluate_deepsets_attention:
+    cmd: python src/models/evaluate.py --data-dir data --pred-path 
+      models/deepsets/predictions_deepsets_attn.tsv --out-dir 
+      artifacts/deepsets_evaluation --mlflow-tracking-uri http://127.0.0.1:5000 
+      --mlflow-experiment vk-ads-reach-prediction
+    deps:
+    - path: data/raw/validate.tsv
+      hash: md5
+      md5: da694dc06c0a965a07d0495254119019
+      size: 6177346
+    - path: data/raw/validate_answers.tsv
+      hash: md5
+      md5: bc6b2a171c69cf6d0f06dcdd8d3f29e6
+      size: 18302
+    - path: models/deepsets/predictions_deepsets_attn.tsv
+      hash: md5
+      md5: 7a55c608503e865b73267952195daeca
+      size: 55591
+    - path: src/models/evaluate.py
+      hash: md5
+      md5: aa98f41620051b0c136bb910b72a876d
+      size: 7365
+    params:
+      params.yaml:
+        mlflow.experiment: vk-ads-reach-prediction
+        mlflow.tracking_uri: http://127.0.0.1:5000
+    outs:
+    - path: artifacts/deepsets_evaluation
+      hash: md5
+      md5: 769f79407837bf0d5252d762844ed35b.dir
+      size: 213869
+      nfiles: 2

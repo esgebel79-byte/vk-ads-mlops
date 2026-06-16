@@ -1,7 +1,10 @@
 stages:
 
   stage1_prepare_data:
-    cmd: python src/data/make_dataset.py --data-dir ${data.raw_dir} --out-dir ${data.interim_dir}/stage1
+    cmd: >-
+      python src/data/make_dataset.py
+      --data-dir ${data.raw_dir}
+      --out-dir ${data.interim_dir}/stage1
     params:
       - data.raw_dir
       - data.interim_dir
@@ -12,7 +15,13 @@ stages:
       - ${data.interim_dir}/stage1
 
   stage2_offline_dataset:
-    cmd: python src/data/make_offline_dataset.py --stage1-dir ${data.interim_dir}/stage1 --out-dir ${data.interim_dir}/stage2 --n-campaigns ${offline_dataset.n_campaigns} --seed ${seed} --max-window-hours ${offline_dataset.max_window_hours}
+    cmd: >-
+      python src/data/make_offline_dataset.py
+      --stage1-dir ${data.interim_dir}/stage1
+      --out-dir ${data.interim_dir}/stage2
+      --n-campaigns ${offline_dataset.n_campaigns}
+      --seed ${seed}
+      --max-window-hours ${offline_dataset.max_window_hours}
     params:
       - seed
       - data.interim_dir
@@ -25,7 +34,10 @@ stages:
       - ${data.interim_dir}/stage2
 
   stage3_user_features:
-    cmd: python src/features/build_user_features.py --stage1-dir ${data.interim_dir}/stage1 --out-dir ${data.processed_dir}/stage9
+    cmd: >-
+      python src/features/build_user_features.py
+      --stage1-dir ${data.interim_dir}/stage1
+      --out-dir ${data.processed_dir}/stage9
     params:
       - data.interim_dir
       - data.processed_dir
@@ -36,7 +48,14 @@ stages:
       - ${data.processed_dir}/stage9
 
   stage4_prepare_deepsets:
-    cmd: python src/features/prepare_deepsets_dataset.py --stage1-dir ${data.interim_dir}/stage1 --stage2-dir ${data.interim_dir}/stage2 --stage9-dir ${data.processed_dir}/stage9 --out-dir ${data.processed_dir}/stage10 --K ${deepsets.K} --seed ${seed}
+    cmd: >-
+      python src/features/prepare_deepsets_dataset.py
+      --stage1-dir ${data.interim_dir}/stage1
+      --stage2-dir ${data.interim_dir}/stage2
+      --stage9-dir ${data.processed_dir}/stage9
+      --out-dir ${data.processed_dir}/stage10
+      --K ${deepsets.K}
+      --seed ${seed}
     params:
       - seed
       - data.interim_dir
@@ -50,8 +69,76 @@ stages:
     outs:
       - ${data.processed_dir}/stage10
 
-  stage5_train_model:
-    cmd: python src/models/train_deepsets_attention.py --stage10-dir ${data.processed_dir}/stage10 --out-dir models/deepsets --seed ${seed} --epochs ${train.epochs} --batch-size ${train.batch_size} --lr ${train.lr} --device ${train.device} --model-type ${train.model_type} --mlflow-tracking-uri ${mlflow.tracking_uri} --mlflow-experiment ${mlflow.experiment}
+  stage5_train_catboost_baseline:
+    cmd: >-
+      python src/models/train_catboost_baseline.py
+      --stage2-dir ${data.interim_dir}/stage2
+      --out-dir models/catboost_baseline
+      --seed ${seed}
+      --iters 1000
+      --mlflow-tracking-uri ${mlflow.tracking_uri}
+      --mlflow-experiment ${mlflow.experiment}
+    params:
+      - seed
+      - data.interim_dir
+      - mlflow.tracking_uri
+      - mlflow.experiment
+    deps:
+      - src/models/train_catboost_baseline.py
+      - ${data.interim_dir}/stage2
+    outs:
+      - models/catboost_baseline
+
+  stage6_predict_catboost_baseline:
+    cmd: >-
+      python src/models/predict_catboost_baseline.py
+      --data-dir data
+      --models-dir models/catboost_baseline
+      --out-dir artifacts/catboost_predictions
+      --mlflow-tracking-uri ${mlflow.tracking_uri}
+      --mlflow-experiment ${mlflow.experiment}
+    params:
+      - mlflow.tracking_uri
+      - mlflow.experiment
+    deps:
+      - src/models/predict_catboost_baseline.py
+      - models/catboost_baseline
+      - ${data.raw_dir}/validate.tsv
+    outs:
+      - artifacts/catboost_predictions
+
+  stage7_evaluate_catboost_baseline:
+    cmd: >-
+      python src/models/evaluate.py
+      --data-dir data
+      --pred-path artifacts/catboost_predictions/predictions.tsv
+      --out-dir artifacts/catboost_evaluation
+      --mlflow-tracking-uri ${mlflow.tracking_uri}
+      --mlflow-experiment ${mlflow.experiment}
+    params:
+      - mlflow.tracking_uri
+      - mlflow.experiment
+    deps:
+      - src/models/evaluate.py
+      - artifacts/catboost_predictions/predictions.tsv
+      - ${data.raw_dir}/validate.tsv
+      - ${data.raw_dir}/validate_answers.tsv
+    outs:
+      - artifacts/catboost_evaluation
+
+  stage8_train_evaluate_deepsets_attention:
+    cmd: >-
+      python src/models/train_deepsets_attention.py
+      --stage10-dir ${data.processed_dir}/stage10
+      --out-dir models/deepsets
+      --seed ${seed}
+      --epochs ${train.epochs}
+      --batch-size ${train.batch_size}
+      --lr ${train.lr}
+      --device ${train.device}
+      --model-type ${train.model_type}
+      --mlflow-tracking-uri ${mlflow.tracking_uri}
+      --mlflow-experiment ${mlflow.experiment}
     params:
       - seed
       - data.processed_dir
@@ -67,3 +154,22 @@ stages:
       - ${data.processed_dir}/stage10
     outs:
       - models/deepsets
+
+  stage9_evaluate_deepsets_attention:
+    cmd: >-
+      python src/models/evaluate.py
+      --data-dir data
+      --pred-path models/deepsets/predictions_deepsets_attn.tsv
+      --out-dir artifacts/deepsets_evaluation
+      --mlflow-tracking-uri ${mlflow.tracking_uri}
+      --mlflow-experiment ${mlflow.experiment}
+    params:
+      - mlflow.tracking_uri
+      - mlflow.experiment
+    deps:
+      - src/models/evaluate.py
+      - models/deepsets/predictions_deepsets_attn.tsv
+      - ${data.raw_dir}/validate.tsv
+      - ${data.raw_dir}/validate_answers.tsv
+    outs:
+      - artifacts/deepsets_evaluation
