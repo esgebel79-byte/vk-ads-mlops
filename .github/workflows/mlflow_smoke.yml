@@ -16,9 +16,18 @@ jobs:
           for i in {1..30}; do curl -sS http://127.0.0.1:5000/ || true; sleep 2; done
       - name: Run MLflow smoke script
         run: |
-          python -m pip install --upgrade pip
+python -m pip install --upgrade pip
           pip install mlflow
-          python - <<'PY'
+          python - <<'EOF'
+          import mlflow
+          mlflow.set_tracking_uri('http://127.0.0.1:5000')
+          exp = mlflow.get_experiment_by_name('ci-smoke')
+          if exp is None:
+              mlflow.create_experiment('ci-smoke')
+          with mlflow.start_run(experiment_id=mlflow.get_experiment_by_name('ci-smoke').experiment_id):
+              mlflow.log_param('smoke', True)
+              mlflow.log_metric('accuracy', 0.5)
+          EOF
 import mlflow
 mlflow.set_tracking_uri('http://127.0.0.1:5000')
 exp = mlflow.get_experiment_by_name('ci-smoke')
