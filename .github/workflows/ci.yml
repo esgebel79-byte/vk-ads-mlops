@@ -14,10 +14,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+          cache: 'pip' # Кэширование ускорит повторные сборки в разы
+
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
@@ -31,20 +32,23 @@ jobs:
           # 3. Доустанавливаем инструменты самого тестирования
           pip install pytest httpx
 
-          if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi
-          if [ -f tests/requirements.txt ]; then pip install -r tests/requirements.txt || true; fi
       - name: Run tests
         run: |
-          pytest -q
+          python -m pytest -q
 
   frontend-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm' # Кэширование для Node.js
+          cache-dependency-path: ui/package-lock.json
+
       - name: Install and build UI
         working-directory: ui
         run: |
