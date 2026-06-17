@@ -24,13 +24,13 @@ jobs:
           python -m pip install --upgrade pip
 
           # 1. Устанавливаем базовый бэкенд
-          pip install -r requirements.txt
+          pip install -r services/inference_api/requirements.txt
 
           # 2. Устанавливаем ML-зависимости (откуда подтянется numpy)
-          pip install -r requerements-inference.txt
+          pip install -r services/inference_api/requirements-inference.txt
           
           # 3. Доустанавливаем инструменты самого тестирования
-          pip install pytest httpx
+          pip install -r tests/requirements.txt
 
       - name: Run tests
         run: |
