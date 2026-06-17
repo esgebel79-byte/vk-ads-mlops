@@ -10,14 +10,27 @@ jobs:
   python-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+          cache: 'pip'
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
+
+          # 1. Устанавливаем базовый бэкенд
+          pip install -r requirements.txt
+
+          # 2. Устанавливаем ML-зависимости (откуда подтянется numpy)
+          pip install -r requerements-inference.txt
+          
+          # 3. Доустанавливаем инструменты самого тестирования
+          pip install pytest httpx
+
           if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi
           if [ -f tests/requirements.txt ]; then pip install -r tests/requirements.txt || true; fi
       - name: Run tests
