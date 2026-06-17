@@ -38,16 +38,25 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.55.1
+    container_name: prometheus
     command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
     ports:
-      - "127.0.0.1:9090:9090"
+      - '127.0.0.1:9090:9090'
     volumes:
       - ./deployments/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+    networks:
+      - default
     depends_on:
       - api
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:9090/-/healthy']
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   grafana:
     image: grafana/grafana:11.3.1

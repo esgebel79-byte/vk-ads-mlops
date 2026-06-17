@@ -16,8 +16,26 @@ from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from pydantic import BaseModel, Field, model_validator
+
+from .metrics import (
+    init_metrics,
+    record_drift_alert,
+    set_model_loaded,
+    set_queue_size,
+    set_drift_window_size,
+    set_recent_predictions_size,
+    set_model_mae,
+    set_model_rmse,
+    prediction_error_count,
+    prediction_drift_alerts_total,
+    sweep_request_count,
+    sweep_error_count,
+    sweep_latency_seconds,
+    retrain_trigger_count,
+    model_mae,
+    model_rmse,
+)
 
 if TYPE_CHECKING:
     import numpy as _np_types
@@ -241,18 +259,6 @@ class MetadataResponse(BaseModel):
     limits: LimitsMetadata
 
 
-prediction_count = Counter("prediction_count", "Total number of prediction requests")
-prediction_latency_seconds = Histogram(
-    "prediction_latency_seconds",
-    "Prediction latency in seconds",
-    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
-)
-prediction_error_count = Counter("prediction_error_count", "Total number of prediction errors")
-drift_alert_count = Counter("drift_alert_count", "Total number of drift alerts")
-retrain_trigger_count = Counter("retrain_trigger_count", "Total number of retrain trigger attempts")
-model_mae = Gauge("model_mae", "Latest model validation mean MAE")
-model_rmse = Gauge("model_rmse", "Latest model validation mean RMSE")
-
 def parse_cors_origins(raw: str | None) -> list[str]:
     if raw is None:
         return list(DEFAULT_CORS_ORIGINS)
@@ -305,6 +311,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize Prometheus metrics
+init_metrics(app)
+
 recent_predictions: deque[dict[str, Any]] = deque(maxlen=settings.max_recent_predictions)
 recent_feature_rows: deque[dict[str, float]] = deque(maxlen=settings.drift_window_size)
 model_bundle: "ModelBundle | None" = None
@@ -387,9 +397,9 @@ class ModelBundle:
             report = json.load(f)
         overall = report.get("validate_metrics", {}).get("overall", {})
         if "mean_MAE" in overall:
-            model_mae.set(float(overall["mean_MAE"]))
+            set_model_mae(float(overall["mean_MAE"]))
         if "mean_RMSE" in overall:
-            model_rmse.set(float(overall["mean_RMSE"]))
+            set_model_rmse(float(overall["mean_RMSE"]))
 
     def predict(
         self,
@@ -592,6 +602,7 @@ def get_model_bundle(force_reload: bool = False) -> ModelBundle:
         if missing:
             raise FileNotFoundError("Missing required artifacts: " + ", ".join(missing))
         model_bundle = ModelBundle(settings)
+        set_model_loaded(True)
     return model_bundle
 
 
@@ -823,8 +834,7 @@ def predict(request: CampaignRequest) -> PredictionResponse:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
         if drift_flag:
-            drift_alert_count.inc()
-        prediction_count.inc()
+            record_drift_alert()
         response = PredictionResponse(
             at_least_one=sanitized["at_least_one"],
             at_least_two=sanitized["at_least_two"],
@@ -857,7 +867,8 @@ def predict(request: CampaignRequest) -> PredictionResponse:
         prediction_error_count.inc()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
-        prediction_latency_seconds.observe(time.perf_counter() - start)
+        set_recent_predictions_size(len(recent_predictions))
+        set_drift_window_size(len(recent_feature_rows))
 
 
 @app.post("/predict/sweep", response_model=SweepResponse)
@@ -919,7 +930,7 @@ def predict_sweep(request: SweepRequest) -> SweepResponse:
             )
 
         if not points:
-            prediction_error_count.inc()
+            sweep_error_count.inc()
             if warnings:
                 detail = (
                     "CPM sweep failed because the model returned non-finite predictions "
@@ -929,6 +940,7 @@ def predict_sweep(request: SweepRequest) -> SweepResponse:
                 detail = "CPM sweep failed because no valid sweep points were produced."
             raise HTTPException(status_code=500, detail=detail)
 
+        sweep_request_count.inc()
         return SweepResponse(
             sweep_id=sweep_id,
             points=points,
@@ -937,20 +949,22 @@ def predict_sweep(request: SweepRequest) -> SweepResponse:
             warnings=warnings,
         )
     except HTTPException:
-        prediction_error_count.inc()
+        sweep_error_count.inc()
         raise
     except ValueError as exc:
-        prediction_error_count.inc()
+        sweep_error_count.inc()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileNotFoundError as exc:
-        prediction_error_count.inc()
+        sweep_error_count.inc()
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except InferenceDependencyError as exc:
-        prediction_error_count.inc()
+        sweep_error_count.inc()
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
-        prediction_error_count.inc()
+        sweep_error_count.inc()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        sweep_latency_seconds.observe(time.perf_counter() - start)
 
 
 @app.get("/predictions/recent")
@@ -970,11 +984,6 @@ def retrain(background_tasks: BackgroundTasks) -> dict[str, Any]:
         }
     background_tasks.add_task(run_retrain, settings.retrain_command)
     return {"status": "started", "command": settings.retrain_command}
-
-
-@app.get("/metrics")
-def metrics() -> Response:
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 if __name__ == "__main__":
