@@ -17,13 +17,20 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/esgebel79-byte/vk-ads-mlops-api:latest
-          imagePullPolicy: Always
+          image: vk-ads-mlops-api:local
+          imagePullPolicy: Never
           ports:
             - containerPort: 8000
           envFrom:
             - configMapRef:
                 name: vk-ads-api-config
+          volumeMounts:
+            - name: models-volume
+              mountPath: /app/models
+              readOnly: true
+            - name: data-volume
+              mountPath: /app/data
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /health
@@ -38,3 +45,12 @@ spec:
             initialDelaySeconds: 40
             periodSeconds: 20
             failureThreshold: 3
+      volumes:
+        - name: models-volume
+          hostPath:
+            path: /mnt/vk-ads-mlops/models
+            type: Directory
+        - name: data-volume
+          hostPath:
+            path: /mnt/vk-ads-mlops/data
+            type: Directory
