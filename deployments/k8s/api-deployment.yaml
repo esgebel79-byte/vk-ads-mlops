@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vk-ads-api
+  namespace: vk-ads-mlops
+  labels:
+    app: vk-ads-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vk-ads-api
+  template:
+    metadata:
+      labels:
+        app: vk-ads-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/esgebel79-byte/vk-ads-mlops-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: vk-ads-api-config
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            failureThreshold: 3
