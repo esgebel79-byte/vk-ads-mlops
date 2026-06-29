@@ -11,6 +11,9 @@ End-to-end MLOps project for predicting advertising campaign reach from auction 
 | **DVC** | Versioned data and model artifacts (not committed to Git) |
 | **MLflow** | Experiment tracking and model registry |
 | **Prometheus / Grafana** | Metrics collection and dashboards |
+| **Kubernetes / minikube** | Local production-like deployment for API and UI services |
+| **ArgoCD** | GitOps synchronization of Kubernetes manifests |
+| **GitHub Actions / GHCR** | CI/CD image build and publication |
 
 Data and trained models live under `data/` and `models/` and are managed by DVC. Git tracks code, configs, and `.dvc` pointer files only.
 
@@ -116,6 +119,322 @@ Build API without heavy inference deps (health/metrics only):
 docker compose build --build-arg INSTALL_INFERENCE_DEPS=false api
 ```
 
+
+## Kubernetes / minikube local deployment
+
+The repository contains Kubernetes manifests for local production-like validation in `deployments/k8s/`.
+
+Manifests:
+
+| File | Purpose |
+|------|---------|
+| `deployments/k8s/namespace.yaml` | Project namespace |
+| `deployments/k8s/api-configmap.yaml` | Backend API configuration |
+| `deployments/k8s/api-deployment.yaml` | Backend API Deployment |
+| `deployments/k8s/api-service.yaml` | Backend API Service |
+| `deployments/k8s/ui-configmap.yaml` | Frontend configuration |
+| `deployments/k8s/ui-deployment.yaml` | Frontend Deployment |
+| `deployments/k8s/ui-service.yaml` | Frontend Service |
+
+### Start minikube
+
+```powershell
+minikube start --driver=docker --memory=3072 --cpus=2 --disk-size=20g
+kubectl get nodes
+```
+
+### Build the local API image with inference dependencies
+
+The API image must be built with `INSTALL_INFERENCE_DEPS=true`; otherwise `/predict` may fail because packages such as `numpy`, `pandas`, and `torch` are not installed.
+
+```powershell
+docker build `
+  -f services/inference_api/Dockerfile `
+  --build-arg INSTALL_INFERENCE_DEPS=true `
+  -t vk-ads-mlops-api:local `
+  .
+```
+
+Load the local image into minikube:
+
+```powershell
+minikube image load vk-ads-mlops-api:local
+minikube image ls | Select-String "vk-ads-mlops-api"
+```
+
+Expected image:
+
+```text
+docker.io/library/vk-ads-mlops-api:local
+```
+
+### Mount local DVC artifacts into minikube
+
+The API pod expects model and data artifacts under `/app/models` and `/app/data`. For local minikube runs, mount the project directory into the minikube VM.
+
+Open a separate PowerShell window and keep it running:
+
+```powershell
+cd D:\PythonProjects\vk-ads-mlops
+minikube mount D:\PythonProjects\vk-ads-mlops:/mnt/vk-ads-mlops
+```
+
+If this window is closed, the API pod loses access to local `data/` and `models/`.
+
+### Apply Kubernetes manifests
+
+From the repository root:
+
+```powershell
+kubectl apply -f deployments\k8s
+kubectl get all -n vk-ads-mlops
+```
+
+### Use the local API image in minikube
+
+If `api-deployment.yaml` points to GHCR, temporarily patch the deployment to use the local image:
+
+```powershell
+kubectl patch deployment vk-ads-api -n vk-ads-mlops --type='json' -p='[
+  {"op":"replace","path":"/spec/template/spec/containers/0/image","value":"vk-ads-mlops-api:local"},
+  {"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"}
+]'
+```
+
+Wait for rollout:
+
+```powershell
+kubectl rollout status deployment/vk-ads-api -n vk-ads-mlops
+kubectl get pods -n vk-ads-mlops
+```
+
+### Verify dependencies inside the API pod
+
+```powershell
+kubectl exec -n vk-ads-mlops deployment/vk-ads-api -- python -c "import numpy; import pandas; import torch; print('basic ok')"
+```
+
+Expected output:
+
+```text
+basic ok
+```
+
+Project imports:
+
+```powershell
+kubectl exec -n vk-ads-mlops deployment/vk-ads-api -- python -c "from src.features.prepare_deepsets_dataset import build_campaign_features; from src.monitoring.drift import data_drift_report; from src.models.train_deepsets_attention import HeavyDeepSets; print('inference imports ok')"
+```
+
+Expected output:
+
+```text
+inference imports ok
+```
+
+### Port-forward API and UI
+
+Open a separate PowerShell window for the API:
+
+```powershell
+kubectl port-forward -n vk-ads-mlops svc/vk-ads-api-service 8000:80
+```
+
+Open another PowerShell window for the UI:
+
+```powershell
+kubectl port-forward -n vk-ads-mlops svc/vk-ads-ui-service 3001:80
+```
+
+Local URLs:
+
+| Service | URL |
+|---------|-----|
+| Frontend UI | http://127.0.0.1:3001 |
+| Backend health | http://127.0.0.1:8000/health |
+| Backend docs | http://127.0.0.1:8000/docs |
+
+### Smoke-test the Kubernetes deployment
+
+Health check:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health | ConvertTo-Json -Depth 10
+```
+
+Expected critical fields:
+
+```json
+{
+  "status": "ok",
+  "model_ready": true
+}
+```
+
+Prediction:
+
+```powershell
+$body = @{
+  hour_start = 0
+  hour_end = 24
+  publishers = @()
+  audience_size = 100
+  user_ids = @()
+  cpm = 50
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri http://127.0.0.1:8000/predict `
+  -ContentType "application/json" `
+  -Body $body | ConvertTo-Json -Depth 10
+```
+
+Expected response fields:
+
+```text
+at_least_one
+at_least_two
+at_least_three
+model_version
+drift_flag
+prediction_id
+```
+
+## ArgoCD GitOps deployment
+
+The repository contains an ArgoCD Application manifest:
+
+```text
+deployments/argocd/application.yaml
+```
+
+The Application syncs Kubernetes resources from:
+
+```text
+repoURL: https://github.com/esgebel79-byte/vk-ads-mlops.git
+targetRevision: k8s-argocd
+path: deployments/k8s
+```
+
+### Install ArgoCD in minikube
+
+```powershell
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+Wait for ArgoCD components:
+
+```powershell
+kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
+kubectl wait --for=condition=available --timeout=300s deployment/argocd-repo-server -n argocd
+kubectl wait --for=condition=available --timeout=300s deployment/argocd-applicationset-controller -n argocd
+kubectl wait --for=condition=ready --timeout=300s pod -l app.kubernetes.io/name=argocd-redis -n argocd
+kubectl get pods -n argocd
+```
+
+### Apply the ArgoCD Application
+
+```powershell
+kubectl apply -f deployments\argocd\application.yaml
+kubectl get applications -n argocd
+```
+
+Expected status:
+
+```text
+vk-ads-mlops   Synced   Healthy
+```
+
+Detailed check:
+
+```powershell
+kubectl describe application vk-ads-mlops -n argocd
+```
+
+Look for:
+
+```text
+Health:
+  Status: Healthy
+
+Sync:
+  Status: Synced
+
+Operation State:
+  Phase: Succeeded
+```
+
+### Open the ArgoCD UI
+
+Port-forward the ArgoCD server:
+
+```powershell
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+Open:
+
+```text
+https://127.0.0.1:8080
+```
+
+Get the initial admin password:
+
+```powershell
+kubectl -n argocd get secret argocd-initial-admin-secret `
+  -o jsonpath="{.data.password}" | ForEach-Object {
+    [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_))
+  }
+```
+
+Login:
+
+```text
+username: admin
+password: <command output>
+```
+
+Application to check:
+
+```text
+vk-ads-mlops
+```
+
+Expected ArgoCD UI status:
+
+```text
+Synced
+Healthy
+```
+
+## CI/CD and GHCR images
+
+GitHub Actions workflows are stored in:
+
+```text
+.github/workflows/cd.yml
+.github/workflows/release_on_tag.yml
+```
+
+The API image must be built with inference dependencies:
+
+```yaml
+build-args: |
+  INSTALL_INFERENCE_DEPS=true
+```
+
+After merge to `main`, CI should publish:
+
+```text
+ghcr.io/esgebel79-byte/vk-ads-mlops-api:latest
+ghcr.io/esgebel79-byte/vk-ads-mlops-ui:latest
+```
+
+ArgoCD can then sync Kubernetes manifests that reference GHCR images. For local minikube checks before the GHCR image is rebuilt, use `vk-ads-mlops-api:local` and `imagePullPolicy: Never`.
+
+
 ## Environment variables
 
 ### Backend (API)
@@ -196,6 +515,10 @@ Verify:
 | Windows Unicode in MLflow logs | Use UTF-8 console or redirect logs if encoding errors appear |
 | Docker port conflicts | Change host ports in `docker-compose.yml` or stop conflicting services |
 | Empty publisher list in UI | Artifacts missing — `/metadata` still returns 200 with empty universe |
+| `/predict` returns 503 in Kubernetes | Verify the API image was built with `INSTALL_INFERENCE_DEPS=true`; run `kubectl exec ... import numpy` |
+| `model_ready=false` in Kubernetes | Keep `minikube mount` running and verify `/app/models` and `/app/data` inside the API pod |
+| ArgoCD `OutOfSync` | Check `repoURL`, `targetRevision`, and `path` in `deployments/argocd/application.yaml` |
+| Docker build hangs on `exporting layers` | Check free disk space; run `docker builder prune -af` and `docker system prune -af` after Docker is healthy |
 
 ## Git contribution workflow
 
@@ -211,7 +534,8 @@ services/inference_api/   FastAPI inference service
 ui/                       React marketer dashboard
 src/                      Training pipeline (data, features, models, monitoring)
 deployments/monitoring/   Prometheus & Grafana configs
-deployments/k8s/          Kubernetes manifests (future)
+deployments/k8s/          Kubernetes manifests for API/UI
+deployments/argocd/       ArgoCD Application manifest
 tests/                    Backend tests
 dvc.yaml                  DVC pipeline
 docker-compose.yml        Full local stack
