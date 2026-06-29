@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
         - name: api
-          image: vk-ads-mlops-api:local
-          imagePullPolicy: Never
+          image: ghcr.io/esgebel79-byte/vk-ads-mlops-api:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           envFrom:

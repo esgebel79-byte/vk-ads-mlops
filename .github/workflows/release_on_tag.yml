@@ -36,6 +36,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/vk-ads-mlops-api:${{ github.ref_name }}
             ghcr.io/${{ github.repository_owner }}/vk-ads-mlops-api:latest
+          build-args: |
+            INSTALL_INFERENCE_DEPS=true
       - name: Build and push UI image
         uses: docker/build-push-action@v4
         with:

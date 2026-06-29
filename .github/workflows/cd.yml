@@ -26,6 +26,8 @@ jobs:
           file: ./services/inference_api/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/vk-ads-mlops-api:latest
+          build-args: |
+            INSTALL_INFERENCE_DEPS=true
       - name: Build and push UI image to GHCR
         uses: docker/build-push-action@v5
         with:
