@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vk-ads-api-config
+  namespace: vk-ads-mlops
+data:
+  CORS_ALLOW_ORIGINS: "*"
+  MODEL_PATH: "/app/models/deepsets/deepsets_attn.pt"
+  MODEL_REPORT_PATH: "/app/models/deepsets/report_stage13.json"
+  STAGE10_DIR: "/app/data/processed/stage10"
+  MLFLOW_TRACKING_URI: "http://mlflow-service:5000"
+  CPM_MIN: "1"
+  CPM_MAX: "500"
+  CPM_STEP: "10"
+  MAX_SWEEP_POINTS: "50"
+  DEFAULT_INFERENCE_USER_SAMPLE_SIZE: "1000"
+  DRIFT_THRESHOLD: "0.2"
+  DRIFT_WINDOW_SIZE: "100"
+  DRIFT_MIN_BATCH: "20"
