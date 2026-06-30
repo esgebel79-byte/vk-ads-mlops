@@ -1,24 +1,27 @@
-name: CD — Push images & deploy
+﻿name: CD - Build and publish Docker images
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  # Используем только этот блок, так как он работает сам и не просит паролей
   build-and-push-ghcr:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
+
     steps:
       - uses: actions/checkout@v4
-      - name: Log in to GitHub Packages (ghcr)
+
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and push API image to GHCR
         uses: docker/build-push-action@v5
         with:
@@ -28,6 +31,7 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/vk-ads-mlops-api:latest
           build-args: |
             INSTALL_INFERENCE_DEPS=true
+
       - name: Build and push UI image to GHCR
         uses: docker/build-push-action@v5
         with:
@@ -35,19 +39,3 @@ jobs:
           file: ./ui/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/vk-ads-mlops-ui:latest
-
-  # Деплой начнется автоматически сразу после успешной сборки в GHCR
-  deploy:
-    needs: build-and-push-ghcr  
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd ${{ secrets.DEPLOY_PATH }}
-            docker compose pull
-            docker compose up -d --remove-orphans
